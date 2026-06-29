@@ -1,0 +1,10 @@
+.env
+.git
+.gitignore
+.pytest_cache
+__pycache__
+venv
+*.db
+*.pdf
+run_daily.bat
+test_suite.py

@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  publisher:
+    build: .
+    container_name: agp-publisher
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - DATABASE_PATH=/app/data/agp_database.db
+      - RUN_ON_STARTUP=false
+    volumes:
+      - agp_data:/app/data
+
+volumes:
+  agp_data:
+    driver: local

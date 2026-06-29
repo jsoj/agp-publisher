@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.pytest_cache/
+
+# Local configuration and credentials
+.env
+
+# Database and Generated Files
+*.db
+*.pdf
+
+# OS/IDE
+.DS_Store
+.idea/
+.vscode/

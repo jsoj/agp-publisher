@@ -1,0 +1,7 @@
+google-genai
+markdown
+requests
+pytest
+pywhatkit
+python-dotenv
+xhtml2pdf
