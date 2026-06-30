@@ -23,4 +23,6 @@ COPY PROMPTS.md .
 # Create directory for persisted database volume
 RUN mkdir -p /app/data
 
+ENV PYTHONUNBUFFERED=1
+
 CMD ["python", "scheduler.py"]

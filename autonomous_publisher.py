@@ -19,6 +19,7 @@ WHATSAPP_API_URL = os.environ.get("WHATSAPP_API_URL", "http://evolution-api/mess
 WHATSAPP_API_TOKEN = os.environ.get("WHATSAPP_API_TOKEN", "SEU_TOKEN")
 WHATSAPP_GROUP_ID = os.environ.get("WHATSAPP_GROUP_ID", "123456789@g.us")
 DATABASE_FILE = os.environ.get("DATABASE_PATH", "agp_database.db")
+LINK_GROUP = os.environ.get("LINK_GROUP", "https://chat.whatsapp.com/DJDWRobITde5Mc7SZ4De1R")
 
 # Inicializa o cliente do novo SDK google-genai
 client = genai.Client(api_key=GEMINI_API_KEY)
@@ -98,7 +99,7 @@ class ExecutiveSummarizer:
         REGRAS DE FORMATAÇÃO E ESTRUTURA (OBRIGATÓRIO):
         1. O título principal deve ser EXATAMENTE: "# I.A. Nível 01"
         2. O subtítulo deve ser EXATAMENTE: "## José S.O. Junior (43) 9 8859-7348"
-        3. Adicione o link do grupo: "🔗 **Grupo de WhatsApp:** [Acesse aqui](https://chat.whatsapp.com/DJDWRobITde5Mc7SZ4De1R)"
+        3. Adicione o link do grupo: "🔗 **Grupo de WhatsApp:** [Acesse aqui]({LINK_GROUP})"
         4. Adicione a data atual: "**Data:** {datetime.date.today().strftime('%d/%m/%Y')}"
         5. NÃO escreva "De:" nem "Para:" ou "Memorando". Vá direto para o "Assunto" e o conteúdo.
         6. O texto deve ser excelente, cobrindo as últimas notícias relevantes de novos modelos, aplicações, informações sobre grandes empresas do setor e mundo open source de I.A.
