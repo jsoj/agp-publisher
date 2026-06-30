@@ -6,7 +6,7 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 WORKDIR /app
 
-# Install system dependencies (build-essential for potential compilation, though usually not needed)
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
@@ -16,13 +16,14 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application files
-COPY autonomous_publisher.py .
-COPY scheduler.py .
-COPY PROMPTS.md .
+COPY . .
 
 # Create directory for persisted database volume
 RUN mkdir -p /app/data
 
 ENV PYTHONUNBUFFERED=1
+ENV DATABASE_PATH=/app/data/agp_database.db
 
-CMD ["python", "scheduler.py"]
+EXPOSE 8000
+
+CMD ["python", "-m", "backend.main"]

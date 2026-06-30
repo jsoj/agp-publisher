@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AGP Publisher - Painel SaaS</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="icon" type="image/png" href="/static/logo.png" id="favicon-link">
+</head>
+<body>
+
+  <!-- ==========================================
+       TELA DE LOGIN / REGISTRO
+       ========================================== -->
+  <div id="login-section" class="login-container">
+    <div class="login-card">
+      <img src="/static/logo.png" alt="Logo" class="login-logo" id="login-logo-img" onerror="this.src='https://placehold.co/180x60/1e3a8a/ffffff?text=AGP+Publisher'">
+      <h2 id="login-title">Acesse sua Conta</h2>
+      <p id="login-subtitle">Entre com seus dados para gerenciar suas publicações.</p>
+      
+      <form id="login-form">
+        <div class="form-group">
+          <label for="login-username">Usuário</label>
+          <input type="text" id="login-username" class="form-input" required placeholder="Digite seu usuário">
+        </div>
+        <div class="form-group">
+          <label for="login-password">Senha</label>
+          <input type="password" id="login-password" class="form-input" required placeholder="Digite sua senha">
+        </div>
+        <button type="submit" class="btn-primary" style="margin-top: 1.5rem;" id="login-submit-btn">
+          <span>Entrar</span>
+        </button>
+      </form>
+      
+      <div class="login-footer" id="login-footer-text">
+        Não tem conta? <a href="#" id="switch-to-register">Registre-se no Free Trial</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       BARRA LATERAL (SIDEBAR)
+       ========================================== -->
+  <aside id="sidebar-section" class="sidebar" style="display: none;">
+    <div class="sidebar-header">
+      <img src="/static/logo.png" alt="Logo" class="sidebar-logo" id="sidebar-logo-img" onerror="this.src='https://placehold.co/150x40/1e3a8a/ffffff?text=AGP+Publisher'">
+    </div>
+    <ul class="sidebar-menu">
+      <li>
+        <a href="#" class="menu-item active" data-target="dashboard-page">
+          <span>📊</span> Dashboard
+        </a>
+      </li>
+      <li>
+        <a href="#" class="menu-item" data-target="topics-page">
+          <span>🔍</span> Tópicos de Pesquisa
+        </a>
+      </li>
+      <li>
+        <a href="#" class="menu-item" data-target="whatsapp-page">
+          <span>💬</span> Conexão WhatsApp
+        </a>
+      </li>
+      <li>
+        <a href="#" class="menu-item" data-target="history-page">
+          <span>📄</span> Histórico & PDFs
+        </a>
+      </li>
+      <li class="admin-only" style="display: none;">
+        <a href="#" class="menu-item" data-target="admin-page">
+          <span>⚙️</span> Painel Admin
+        </a>
+      </li>
+      <li style="margin-top: auto;">
+        <a href="#" class="menu-item" id="btn-logout" style="color: var(--error);">
+          <span>🚪</span> Sair da Conta
+        </a>
+      </li>
+    </ul>
+    
+    <div class="sidebar-footer">
+      <div class="user-profile">
+        <span class="user-name" id="profile-username">Carregando...</span>
+        <span class="user-plan" id="profile-plan">Free Trial</span>
+      </div>
+      <button class="btn-theme-toggle" id="btn-theme-toggle" title="Alternar Modo Escuro/Claro">🌓</button>
+    </div>
+  </aside>
+
+  <!-- ==========================================
+       CONTEÚDO PRINCIPAL (MAIN CONTENT)
+       ========================================== -->
+  <main id="main-section" class="main-content" style="display: none; margin-left: 260px;">
+    
+    <!-- PÁGINA 1: DASHBOARD HOME -->
+    <section id="dashboard-page" class="page-section active">
+      <div class="page-header">
+        <h1>Dashboard</h1>
+        <div id="trial-alert" class="status-badge status-warning" style="display: none;">Free Trial</div>
+      </div>
+      
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span class="stat-label">Tópicos Ativos</span>
+          <span class="stat-value" id="stat-active-topics">0</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Tokens Usados (Mês)</span>
+          <span class="stat-value" id="stat-tokens-used">0</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Limite do Plano (Tokens)</span>
+          <span class="stat-value" id="stat-tokens-limit">0</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Publicações Enviadas</span>
+          <span class="stat-value" id="stat-pub-sent">0</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">Consumo Recente de Tokens por Tópico</h3>
+        <div class="data-table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Tópico</th>
+                <th>Modelo</th>
+                <th>Prompt Tokens</th>
+                <th>Completion Tokens</th>
+                <th>Total Tokens</th>
+                <th>Data/Hora</th>
+              </tr>
+            </thead>
+            <tbody id="token-logs-table-body">
+              <tr>
+                <td colspan="6" style="text-align: center; color: var(--text-muted);">Nenhum log registrado ainda.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- PÁGINA 2: TÓPICOS DE PESQUISA -->
+    <section id="topics-page" class="page-section">
+      <div class="page-header">
+        <h1>Tópicos de Pesquisa</h1>
+        <button class="btn-primary" id="btn-add-topic" style="width: auto; padding: 0.6rem 1.2rem;">
+          <span>+ Novo Tópico</span>
+        </button>
+      </div>
+
+      <div class="card">
+        <div class="data-table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Nome do Tópico</th>
+                <th>WhatsApp Destino</th>
+                <th>Agendamento</th>
+                <th>Modelo</th>
+                <th>Status</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="topics-table-body">
+              <tr>
+                <td colspan="6" style="text-align: center; color: var(--text-muted);">Carregando tópicos...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- PÁGINA 3: CONEXÃO WHATSAPP -->
+    <section id="whatsapp-page" class="page-section">
+      <div class="page-header">
+        <h1>Conexão WhatsApp</h1>
+      </div>
+      
+      <div class="card" style="text-align: center; max-width: 500px; margin: 0 auto;">
+        <h3 class="card-title" style="margin-bottom: 0.5rem;">Vincule sua Instância do WhatsApp</h3>
+        <p style="color: var(--text-muted); margin-bottom: 2rem; font-size: 0.9rem;">
+          Escaneie o QR Code abaixo com seu celular para habilitar os disparos automatizados de relatórios via Evolution API.
+        </p>
+        
+        <div id="qrcode-wrapper" class="qrcode-box">
+          <img src="" alt="Aguardando QR Code..." id="qrcode-image" class="qrcode-img">
+          <span class="status-badge status-warning" id="wa-status-badge">Aguardando Conexão</span>
+        </div>
+        
+        <button class="btn-primary" id="btn-refresh-qrcode" style="width: auto; margin: 1.5rem auto 0; padding: 0.6rem 1.2rem;">
+          <span>🔄 Atualizar QR Code</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- PÁGINA 4: HISTÓRICO & PDFS -->
+    <section id="history-page" class="page-section">
+      <div class="page-header">
+        <h1>Histórico de Relatórios</h1>
+      </div>
+
+      <div class="card">
+        <div class="data-table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Tópico</th>
+                <th>Data de Envio</th>
+                <th>Status</th>
+                <th>Detalhes / Erro</th>
+                <th>Download PDF</th>
+              </tr>
+            </thead>
+            <tbody id="history-table-body">
+              <tr>
+                <td colspan="5" style="text-align: center; color: var(--text-muted);">Nenhum histórico registrado.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- PÁGINA 5: PAINEL ADMINISTRATIVO -->
+    <section id="admin-page" class="page-section">
+      <div class="page-header">
+        <h1>Painel de Administração</h1>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">Configurações Gerais (White-Label)</h3>
+        <form id="admin-config-form">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+            <div class="form-group">
+              <label for="admin-company-name">Nome da Empresa / App</label>
+              <input type="text" id="admin-company-name" class="form-input" required>
+            </div>
+            <div class="form-group">
+              <label for="admin-logo">Logo da Empresa</label>
+              <input type="file" id="admin-logo" class="form-input" accept="image/*">
+            </div>
+          </div>
+
+          <div class="palette-grid">
+            <div class="palette-item active" data-primary="#1E3A8A" data-secondary="#2563EB">
+              <span>Clássico Executivo</span>
+              <div class="palette-colors">
+                <div class="color-dot" style="background-color: #1E3A8A;"></div>
+                <div class="color-dot" style="background-color: #2563EB;"></div>
+              </div>
+            </div>
+            <div class="palette-item" data-primary="#10B981" data-secondary="#059669">
+              <span>Verde Esmeralda</span>
+              <div class="palette-colors">
+                <div class="color-dot" style="background-color: #10B981;"></div>
+                <div class="color-dot" style="background-color: #059669;"></div>
+              </div>
+            </div>
+            <div class="palette-item" data-primary="#7C3AED" data-secondary="#6D28D9">
+              <span>Violeta Premium</span>
+              <div class="palette-colors">
+                <div class="color-dot" style="background-color: #7C3AED;"></div>
+                <div class="color-dot" style="background-color: #6D28D9;"></div>
+              </div>
+            </div>
+            <div class="palette-item" data-primary="#F59E0B" data-secondary="#D97706">
+              <span>Âmbar Tech</span>
+              <div class="palette-colors">
+                <div class="color-dot" style="background-color: #F59E0B;"></div>
+                <div class="color-dot" style="background-color: #D97706;"></div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+            <div class="form-group">
+              <label for="admin-color-primary">Cor Primária (Hex)</label>
+              <input type="color" id="admin-color-primary" class="form-input" style="height: 42px; padding: 2px;">
+            </div>
+            <div class="form-group">
+              <label for="admin-color-secondary">Cor Secundária (Hex)</label>
+              <input type="color" id="admin-color-secondary" class="form-input" style="height: 42px; padding: 2px;">
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+            <div class="form-group">
+              <label for="admin-evolution-url">URL da Evolution API</label>
+              <input type="url" id="admin-evolution-url" class="form-input" required>
+            </div>
+            <div class="form-group">
+              <label for="admin-evolution-token">Chave Global da Evolution API</label>
+              <input type="password" id="admin-evolution-token" class="form-input" required>
+            </div>
+          </div>
+
+          <button type="submit" class="btn-primary" style="width: auto; padding: 0.6rem 2rem;">
+            <span>Salvar Configurações</span>
+          </button>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="page-header" style="margin-bottom: 1rem;">
+          <h3 class="card-title" style="margin-bottom: 0;">Gestão de Usuários (SaaS/Planos)</h3>
+          <button class="btn-primary" id="btn-add-user" style="width: auto; padding: 0.5rem 1rem;">
+            <span>+ Novo Usuário</span>
+          </button>
+        </div>
+        <div class="data-table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Usuário</th>
+                <th>Papel</th>
+                <th>Plano</th>
+                <th>Limites Tópicos / Tokens</th>
+                <th>Expira Trial</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="admin-users-table-body">
+              <tr>
+                <td colspan="6" style="text-align: center; color: var(--text-muted);">Carregando usuários...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==========================================
+       MODAL: TÓPICO DE PESQUISA (CRIAR / EDITAR)
+       ========================================== -->
+  <div id="topic-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title" id="topic-modal-title">Novo Tópico de Pesquisa</h3>
+        <button class="close-btn" onclick="closeModal('topic-modal')">&times;</button>
+      </div>
+      <form id="topic-form">
+        <input type="hidden" id="topic-id-hidden">
+        
+        <div class="form-group">
+          <label for="topic-name">Nome Amigável do Tópico</label>
+          <input type="text" id="topic-name" class="form-input" required placeholder="Ex: Agricultura e IA">
+        </div>
+        
+        <div class="form-group">
+          <label for="topic-query">Prompt de Busca (Foco de Notícias)</label>
+          <textarea id="topic-query" class="form-input" rows="3" required placeholder="Ex: lançamentos de modelos de visão computacional na agricultura" style="resize: vertical;"></textarea>
+        </div>
+        
+        <div class="form-group">
+          <label for="topic-target">WhatsApp Destino (Número com DDI ou ID do Grupo)</label>
+          <input type="text" id="topic-target" class="form-input" required placeholder="Ex: 554391308954-1606733601">
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+          <div class="form-group">
+            <label for="topic-model">Modelo de Preferência</label>
+            <select id="topic-model" class="form-input">
+              <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+              <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="topic-custom-key">Gemini Key (Opcional - BYOK)</label>
+            <input type="password" id="topic-custom-key" class="form-input" placeholder="Chave do Usuário">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="topic-schedule-type">Modo de Agendamento</label>
+          <select id="topic-schedule-type" class="form-input">
+            <option value="fixed">Horário Fixo Diário</option>
+            <option value="random">Agendamento Flutuante (Humano)</option>
+          </select>
+        </div>
+
+        <!-- Campos de Horário Fixo -->
+        <div id="schedule-fixed-fields" class="form-group">
+          <label for="topic-fixed-time">Horário de Envio (HH:MM)</label>
+          <input type="time" id="topic-fixed-time" class="form-input" value="08:00">
+        </div>
+
+        <!-- Campos de Horário Aleatório -->
+        <div id="schedule-random-fields" class="form-group" style="display: none; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+          <div>
+            <label for="topic-range-start">Início da Janela (HH:MM)</label>
+            <input type="time" id="topic-range-start" class="form-input" value="08:00">
+          </div>
+          <div>
+            <label for="topic-range-end">Fim da Janela (HH:MM)</label>
+            <input type="time" id="topic-range-end" class="form-input" value="10:00">
+          </div>
+        </div>
+
+        <button type="submit" class="btn-primary" style="margin-top: 1.5rem;">
+          <span>Salvar Tópico</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       MODAL: USUÁRIO (CRIAR / EDITAR)
+       ========================================== -->
+  <div id="user-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title" id="user-modal-title">Novo Usuário</h3>
+        <button class="close-btn" onclick="closeModal('user-modal')">&times;</button>
+      </div>
+      <form id="user-form">
+        <input type="hidden" id="user-id-hidden">
+        
+        <div class="form-group">
+          <label for="user-username">Usuário</label>
+          <input type="text" id="user-username" class="form-input" required placeholder="Nome de login">
+        </div>
+        
+        <div class="form-group">
+          <label for="user-password">Senha</label>
+          <input type="password" id="user-password" class="form-input" placeholder="Digite uma senha">
+        </div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+          <div class="form-group">
+            <label for="user-role">Função / Papel</label>
+            <select id="user-role" class="form-input">
+              <option value="user">Usuário Comum</option>
+              <option value="admin">Administrador</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="user-plan">Plano</label>
+            <select id="user-plan" class="form-input">
+              <option value="free_trial">Free Trial</option>
+              <option value="pro">Pro (SaaS)</option>
+              <option value="enterprise">Enterprise</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+          <div class="form-group">
+            <label for="user-max-topics">Limite de Tópicos</label>
+            <input type="number" id="user-max-topics" class="form-input" min="1" value="1">
+          </div>
+          <div class="form-group">
+            <label for="user-max-tokens">Limite Mensal de Tokens</label>
+            <input type="number" id="user-max-tokens" class="form-input" min="1000" value="100000">
+          </div>
+        </div>
+
+        <button type="submit" class="btn-primary" style="margin-top: 1.5rem;">
+          <span>Salvar Usuário</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

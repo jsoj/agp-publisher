@@ -1,34 +1,49 @@
 # Autonomous Group Publisher (AGP)
-Sistema autônomo projetado para VPS (Arch Linux/Ubuntu) com Docker e Coolify. O sistema pesquisa notícias diariamente utilizando a API do Gemini com Google Search Grounding, processa o conteúdo com um fluxo multi-agentes (Redator Sênior + Auditor Factual) para evitar alucinações e erros gramaticais, gera um PDF responsivo (Mobile-First) e envia para um grupo de WhatsApp.
-## 🚀 Tecnologias Utilizadas
-Python 3.11+
-Google Gemini API (Modelos: gemini-2.5-pro para busca com Search Grounding, redação e auditoria final utilizando o SDK google-genai)
-xhtml2pdf & Markdown (Geração de PDFs formatados)
-Pytest (Metodologia Harness para testes de regras de negócio)
-Docker & Docker Compose (Infraestrutura isolada)
-## 📦 Estrutura de Arquivos
-README.md: Este manual.
-architecture.md: Documentação de arquitetura, engenharia de prompts e design patterns.
-docker-compose.yml: Receita de infraestrutura para subir o projeto e o banco de dados.
-autonomous_publisher.py: O núcleo do sistema, contendo o pipeline ETL completo e integração com IA.
-test_suite.py: Suíte de testes automatizados para garantir a qualidade do texto e geração do PDF.
-## 🛠️ Como Executar
-Instale as dependências locais ou utilize o Docker:
-pip install google-genai xhtml2pdf markdown requests pytest
 
+Sistema autônomo projetado para VPS (Arch Linux/Ubuntu) com Docker e Coolify. Originalmente concebido como um pipeline de ETL diário, o sistema está evoluindo para se tornar uma publicadora multiplataforma (WhatsApp, Instagram, Facebook, LinkedIn, YouTube, Telegram, SMS, Email, etc.), iniciando pela **Fase 1: WhatsApp**.
 
-Configure as variáveis de ambiente (idealmente num arquivo .env):
-export GEMINI_API_KEY="sua_chave_aqui"
-export WHATSAPP_API_URL="[http://sua-instancia-evolution-api.local/message/sendMedia](http://sua-instancia-evolution-api.local/message/sendMedia)"
-export WHATSAPP_API_TOKEN="seu_token_aqui"
-export WHATSAPP_GROUP_ID="120363000000000000@g.us"
+O sistema pesquisa notícias/tópicos utilizando a API do Gemini, processa o conteúdo com um fluxo multi-agentes (Pesquisa + Redação + Auditoria Factual) para evitar alucinações e erros gramaticais, gera um PDF responsivo (Mobile-First) via `xhtml2pdf` e envia para grupos/números de WhatsApp usando a **Evolution API**.
 
+---
 
-Execute o script principal:
-python autonomous_publisher.py
+## 🚀 Tecnologias e Stack Proposta (Fase 1)
 
+*   **Backend**: Python 3.11+ / FastAPI (API REST, autenticação JWT, agendamento em segundo plano com `APScheduler`).
+*   **Frontend**: Vite + React + Vanilla CSS (Interface administrativa e do usuário com suporte a temas e White-Label).
+*   **Banco de Dados**: SQLite (`agp_database.db`) expandido para armazenar usuários, tópicos de pesquisa, logs de tokens e histórico de execuções.
+*   **IA & Agentes**: Google Gemini API (modelo `gemini-2.5-pro` via SDK `google-genai`).
+*   **Publicação**: Evolution API (WhatsApp) e `xhtml2pdf` para geração de relatórios físicos.
+*   **Infraestrutura**: Docker & Docker Compose para deployment simplificado em VPS (Coolify).
+*   **Testes (Harness)**: Pytest para garantir o cumprimento estrito das regras de compliance sintático-gramatical e integridade estrutural.
 
-Para rodar os testes da metodologia Harness:
-pytest test_suite.py -v
+---
 
+## 📦 Estrutura do Projeto
 
+*   `autonomous_publisher.py`: Core do pipeline de ETL diário e publicação. **Esta funcionalidade existente deve ser preservada intocada para o grupo principal de I.A.**
+*   `scheduler.py`: Agendador original que roda o script principal diariamente às 08:00 (America/Sao_Paulo).
+*   `test_suite.py`: Suíte de testes automatizados com Pytest.
+*   `run_daily.bat`: Script de lote para execução em ambiente Windows.
+*   `agp_database.db`: Banco SQLite local com histórico e logs.
+*   `requirements.txt`: Dependências do ecossistema.
+
+---
+
+## 🧪 Ambiente de Teste Local (Windows)
+
+Para fins de teste no notebook Windows, o envio do WhatsApp será direcionado para o grupo de notas pessoal:
+*   **Grupo de Notas Pessoal**: `554391308954-1606733601`
+
+---
+
+## 👮 Regras de Negócio e Compliance Estritas
+1.  **Pronomes Oblíquos**: Proibido iniciar sentenças ou parágrafos com "Me", "Te", "Se", "Nos", "Vos".
+2.  **Cabeçalho Obrigatório**:
+    ```markdown
+    # I.A. Nível 01
+    ## José S.O. Junior (43) 9 8859-7348
+    🔗 **Grupo de WhatsApp:** [Acesse aqui]({LINK_GROUP})
+    **Data:** {current_date}
+    ```
+3.  **Assinatura Obrigatória**: O documento deve terminar exatamente com a frase isolada `"Até a próxima edição."`
+4.  **Cores do PDF**: Fundo branco, texto em `#333333` (Graphite), títulos em `#1E3A8A` (Deep Blue), links em `#2563EB` (Blue).
