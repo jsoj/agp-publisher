@@ -2,9 +2,10 @@ import os
 import sys
 import io
 
-# Configura codificação UTF-8 para evitar UnicodeEncodeError com emojis no terminal do Windows
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+# Configura codificação UTF-8 para evitar UnicodeEncodeError com emojis no terminal do Windows (ignorado sob pytest)
+if "pytest" not in sys.modules and not any("pytest" in arg for arg in sys.argv):
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 import datetime
 import shutil
@@ -113,9 +114,95 @@ def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
         )
     return current_user
 
-# ==========================================
-# CORE: PIPELINE MULTI-AGENTE AGP DESSINCRONIZADO
-# ==========================================
+def sanitize_whatsapp_targets(targets_str: str) -> list[str]:
+    if not targets_str:
+        return []
+    targets = []
+    for t in targets_str.split(','):
+        t = t.strip()
+        if not t:
+            continue
+        if '-' in t:
+            if not t.endswith('@g.us'):
+                t = f"{t}@g.us"
+        else:
+            # Apenas números
+            digits = ''.join(filter(str.isdigit, t))
+            if digits:
+                if not digits.endswith('@s.whatsapp.net'):
+                    t = f"{digits}@s.whatsapp.net"
+                else:
+                    t = digits
+        targets.append(t)
+    return targets
+
+def get_time_period_constraint(period: str) -> str:
+    """Retorna uma string descritiva com data limite para o Gemini Search Grounding."""
+    today = datetime.date.today()
+    if period == "24h":
+        start_date = today - datetime.timedelta(days=1)
+        return f"nas últimas 24 horas (desde {start_date.strftime('%Y-%m-%d')})"
+    elif period == "week":
+        start_date = today - datetime.timedelta(days=7)
+        return f"nos últimos 7 dias (desde {start_date.strftime('%Y-%m-%d')})"
+    elif period == "month":
+        start_date = today - datetime.timedelta(days=30)
+        return f"nos últimos 30 dias (desde {start_date.strftime('%Y-%m-%d')})"
+    elif period == "year":
+        return f"no ano de {today.year} (desde {today.year}-01-01)"
+    return f"nos últimos 30 dias (desde {(today - datetime.timedelta(days=30)).strftime('%Y-%m-%d')})"
+
+def get_bcb_financial_facts() -> str:
+    """Busca cotações PTAX recentes e as expectativas do Focus de Câmbio da API do Banco Central."""
+    facts = []
+    
+    # 1. Busca PTAX recente do Dólar
+    try:
+        today = datetime.date.today()
+        start_date = today - datetime.timedelta(days=10)
+        start_str = start_date.strftime('%m-%d-%Y')
+        end_str = today.strftime('%m-%d-%Y')
+        url_ptax = f"https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/CotacaoDolarPeriodo(dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)?@dataInicial='{start_str}'&@dataFinalCotacao='{end_str}'&$format=json"
+        res = requests.get(url_ptax, timeout=8)
+        if res.status_code == 200:
+            data = res.json()
+            quotes = data.get('value', [])
+            if quotes:
+                facts.append("--- DADOS DE COTAÇÃO OFICIAL PTAX DO DÓLAR (FONTE: BANCO CENTRAL DO BRASIL) ---")
+                for q in reversed(quotes):
+                    dt_str = q.get('dataHoraCotacao', '')
+                    if dt_str:
+                        dt_formatted = datetime.datetime.strptime(dt_str.split('.')[0], '%Y-%m-%d %H:%M:%S').strftime('%d/%m/%Y')
+                    else:
+                        dt_formatted = "N/A"
+                    facts.append(f"- Data: {dt_formatted} | PTAX Compra: {q.get('cotacaoCompra'):.4f} | PTAX Venda: {q.get('cotacaoVenda'):.4f}")
+                facts.append("---------------------------------------------------------------------------------")
+    except Exception as e:
+        print(f"⚠️ Erro ao obter dados PTAX do BCB: {e}")
+
+    # 2. Busca Expectativas do Relatório Focus (Dólar Futuro / Câmbio)
+    try:
+        url_focus = "https://olinda.bcb.gov.br/olinda/servico/Expectativas/versao/v1/odata/ExpectativasMercadoAnuais?$filter=Indicador eq 'Câmbio'&$orderby=Data desc&$top=20&$format=json"
+        res = requests.get(url_focus, timeout=8)
+        if res.status_code == 200:
+            data = res.json()
+            entries = data.get('value', [])
+            if entries:
+                facts.append("--- CONSENSO DE EXPECTATIVAS DE CÂMBIO - RELATÓRIO FOCUS (FONTE: BANCO CENTRAL) ---")
+                latest_report_date = entries[0].get('Data')
+                facts.append(f"Data de Divulgação do Relatório Focus: {datetime.datetime.strptime(latest_report_date, '%Y-%m-%d').strftime('%d/%m/%Y')}")
+                for e in entries:
+                    # Filtra apenas baseCalculo 0 para evitar duplicidade de projeções no mesmo ano
+                    if e.get('Data') == latest_report_date and e.get('baseCalculo') == 0:
+                        facts.append(f"- Projeção para Fim de {e.get('DataReferencia')}: Média: R$ {e.get('Media'):.4f} | Mediana: R$ {e.get('Mediana'):.4f}")
+                facts.append("---------------------------------------------------------------------------------")
+    except Exception as e:
+        print(f"⚠️ Erro ao obter dados Focus do BCB: {e}")
+
+    if facts:
+        facts.append("IMPORTANTE (REQUISITO DE ACURÁCIA): Ao escrever ou auditar o relatório, você DEVE utilizar estritamente e exatamente os valores de cotação PTAX e projeções do Relatório Focus listados acima caso vá mencionar esses dados. NUNCA tente deduzir, alucinar ou citar valores diferentes para essas datas/períodos de referência.")
+        return "\n".join(facts)
+    return ""
 
 def run_topic_pipeline(topic_id: int):
     """Executa a coleta, síntese, auditoria, geração do PDF e publicação no WhatsApp para um tópico."""
@@ -146,10 +233,13 @@ def run_topic_pipeline(topic_id: int):
         total_p_tokens = 0
         total_c_tokens = 0
 
-        # MÓDULO 1: DailyCollector
+        # MÓDULO 1: DailyCollector com filtro temporal
         print(f"🔍 [Pipeline] Coletando notícias para tópico '{topic.topic_name}'...")
+        time_constraint = get_time_period_constraint(topic.time_period)
         collector_prompt = f"""
-        Busque as informações e notícias mais recentes sobre: {topic.search_query}.
+        Hoje é dia {datetime.date.today().strftime('%d/%m/%Y')} (Ano de {datetime.date.today().year}).
+        Busque na internet informações e notícias estritamente ocorridas {time_constraint} sobre: {topic.search_query}.
+        Foque em relatórios e dados específicos desse período de tempo recente, descartando fatos de anos anteriores.
         Retorne os fatos principais detalhados e inclua as fontes/links obrigatórios de onde você retirou as informações.
         """
         response_collector = client.models.generate_content(
@@ -157,6 +247,16 @@ def run_topic_pipeline(topic_id: int):
             contents=collector_prompt
         )
         raw_data = response_collector.text
+        
+        # Se for tópico de dólar/ptax/câmbio, busca dados oficiais do BCB e anexa aos dados brutos para grounding indestrutível
+        topic_lower = topic.topic_name.lower()
+        query_lower = topic.search_query.lower()
+        if any(w in topic_lower or w in query_lower for w in ["dólar", "dolar", "ptax", "câmbio", "cambio"]):
+            print(f"[Pipeline] Tópico financeiro detectado. Anexando dados oficiais e projeções do Banco Central do Brasil...")
+            bcb_facts = get_bcb_financial_facts()
+            if bcb_facts:
+                raw_data = f"{bcb_facts}\n\n{raw_data}"
+                
         if response_collector.usage_metadata:
             total_p_tokens += response_collector.usage_metadata.prompt_token_count
             total_c_tokens += response_collector.usage_metadata.candidates_token_count
@@ -169,13 +269,14 @@ def run_topic_pipeline(topic_id: int):
         Transforme os dados brutos a seguir em um relatório executivo de altíssimo valor.
         
         REGRAS DE FORMATAÇÃO E ESTRUTURA (OBRIGATÓRIO):
-        1. O título principal deve ser EXATAMENTE: "# I.A. Nível 01"
+        1. O título principal deve ser EXATAMENTE: "# I.A. Nível 01 - {topic.topic_name}"
         2. O subtítulo deve ser EXATAMENTE: "## José S.O. Junior (43) 9 8859-7348"
         3. Adicione o link do grupo: "🔗 **Grupo de WhatsApp:** [Acesse aqui]({link_group})"
         4. Adicione a data atual: "**Data:** {datetime.date.today().strftime('%d/%m/%Y')}"
         5. NÃO escreva "De:" nem "Para:" ou "Memorando". Vá direto para o "Assunto" e o conteúdo.
         6. O texto deve ser excelente, cobrindo as notícias com base nos dados fornecidos.
         7. No final do documento, você DEVE listar todas as Referências de pesquisa (links e fontes).
+        8. Ao criar tabelas em Markdown (como cotações PTAX ou projeções Focus), certifique-se de que cada linha da tabela (cabeçalho, separador e cada linha de dados) esteja em uma LINHA FÍSICA SEPARADA com quebras de linha normais (\n). NUNCA junte ou colapse várias linhas de tabela em um único parágrafo contínuo.
         
         DADOS BRUTOS:
         {raw_data}
@@ -196,8 +297,9 @@ def run_topic_pipeline(topic_id: int):
         Revise o seguinte rascunho de relatório de acordo com estas REGRAS ABSOLUTAS:
         1. NUNCA inicie uma frase ou parágrafo com o pronome oblíquo "Me", "Te", "Se", "Nos" ou "Vos".
         2. Mantenha todas as fontes, links de referências e citações. É vital que as fontes apareçam no documento final.
-        3. Mantenha os cabeçalhos exatos: "# I.A. Nível 01", o subtítulo de telefone e a Data. NUNCA adicione blocos como "De/Para".
+        3. Mantenha os cabeçalhos exatos: "# I.A. Nível 01 - {topic.topic_name}", o subtítulo de telefone e a Data. NUNCA adicione blocos como "De/Para".
         4. O relatório DEVE terminar OBRIGATORIAMENTE com a seguinte frase exata e isolada no final: "Até a próxima edição."
+        5. Garanta que todas as tabelas em Markdown estejam perfeitamente formatadas com quebras de linha físicas normais para cada linha de dados (cabeçalho, separador e linhas de conteúdo). NUNCA permita que tabelas fiquem colapsadas em uma única linha horizontal com barras duplas (||). Se encontrar, quebre-as em linhas separadas.
         
         RASCUNHO:
         {draft_text}
@@ -227,6 +329,9 @@ def run_topic_pipeline(topic_id: int):
         a { color: #2563EB; }
         ul { padding-left: 20px; }
         li { margin-bottom: 5px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 15px; }
+        th { background-color: #1E3A8A; color: #ffffff; padding: 6px; font-weight: bold; border: 1px solid #1E3A8A; text-align: left; }
+        td { padding: 6px; border: 1px solid #dddddd; text-align: left; }
         """
         
         full_html = f"""
@@ -262,20 +367,27 @@ def run_topic_pipeline(topic_id: int):
         with open(pdf_filename, "rb") as pdf_file:
             b64_content = base64.b64encode(pdf_file.read()).decode('utf-8')
             
-        payload = {
-            "number": topic.whatsapp_target,
-            "mediatype": "document",
-            "mimetype": "application/pdf",
-            "media": b64_content,
-            "fileName": os.path.basename(pdf_filename),
-            "caption": f"📊 *Relatório: {topic.topic_name}*"
-        }
+        # Divide e sanitiza os destinos do WhatsApp
+        targets = sanitize_whatsapp_targets(topic.whatsapp_target)
+        if not targets:
+            raise ValueError("Nenhum destinatário do WhatsApp válido configurado.")
 
-        # Faz o request HTTP
-        response_wa = requests.post(evolution_url, headers=headers, json=payload, timeout=30)
-        response_wa.raise_for_status()
+        # Dispara para cada destinatário
+        for target in targets:
+            print(f"[Pipeline] Enviando PDF para destinatário: {target}")
+            payload = {
+                "number": target,
+                "mediatype": "document",
+                "mimetype": "application/pdf",
+                "media": b64_content,
+                "fileName": os.path.basename(pdf_filename),
+                "caption": f"📊 *Relatório: {topic.topic_name}*"
+            }
+            # Faz o request HTTP com timeout expandido para 90s
+            response_wa = requests.post(evolution_url, headers=headers, json=payload, timeout=90)
+            response_wa.raise_for_status()
 
-        # Salva o Log de Tokens e Histórico de Envio
+        # Salva o Log de Tokens e Histórico de Envio com o Markdown Gerado
         token_log = TokenLog(
             user_id=user.id,
             topic_id=topic_id,
@@ -289,7 +401,8 @@ def run_topic_pipeline(topic_id: int):
         history_entry = PublicationHistory(
             topic_id=topic_id,
             pdf_path=pdf_filename,
-            status="success"
+            status="success",
+            generated_markdown=final_text
         )
         db.add(history_entry)
         db.commit()
@@ -305,7 +418,8 @@ def run_topic_pipeline(topic_id: int):
             topic_id=topic_id,
             pdf_path=pdf_filename if 'pdf_filename' in locals() else "N/A",
             status="error",
-            error_message=str(e)
+            error_message=str(e),
+            generated_markdown=final_text if 'final_text' in locals() else None
         )
         db.add(history_entry)
         db.commit()
@@ -444,7 +558,8 @@ def create_topic(topic_data: TopicCreate, current_user: User = Depends(get_curre
         random_range_end=topic_data.random_range_end,
         days_of_week=topic_data.days_of_week,
         custom_gemini_key=topic_data.custom_gemini_key,
-        preferred_model=topic_data.preferred_model
+        preferred_model=topic_data.preferred_model,
+        time_period=topic_data.time_period
     )
     db.add(new_topic)
     db.commit()
@@ -705,5 +820,5 @@ def get_whatsapp_connect_qrcode(current_user: User = Depends(get_current_user), 
 
 if __name__ == "__main__":
     import uvicorn
-    # Executa o servidor na porta 8000
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Executa o servidor na porta 8080 para evitar conflitos com outros servidores locais (ex: Django)
+    uvicorn.run(app, host="0.0.0.0", port=8080)

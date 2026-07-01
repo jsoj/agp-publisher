@@ -53,6 +53,7 @@ class TopicCreate(BaseModel):
     days_of_week: Optional[str] = None # "1,2,3,4,5"
     custom_gemini_key: Optional[str] = None
     preferred_model: Optional[str] = "gemini-2.5-pro"
+    time_period: Optional[str] = "month"
 
 class TopicUpdate(BaseModel):
     topic_name: Optional[str] = None
@@ -66,6 +67,7 @@ class TopicUpdate(BaseModel):
     custom_gemini_key: Optional[str] = None
     preferred_model: Optional[str] = None
     is_active: Optional[int] = None
+    time_period: Optional[str] = None
 
 class TopicResponse(BaseModel):
     id: int
@@ -81,6 +83,7 @@ class TopicResponse(BaseModel):
     custom_gemini_key: Optional[str] = None
     preferred_model: str
     is_active: int
+    time_period: str
     created_at: datetime
 
     class Config:
@@ -130,6 +133,7 @@ class HistoryResponse(BaseModel):
     sent_at: datetime
     status: str
     error_message: Optional[str] = None
+    generated_markdown: Optional[str] = None
 
     class Config:
         from_attributes = True

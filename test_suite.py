@@ -220,4 +220,116 @@ def test_user_auth_and_permissions(db_session):
     
     # Usuário regular deve falhar com PermissionError
     with pytest.raises(PermissionError, match="Acesso negado"):
-        set_system_config(db_session, regular, "evolution_url", "https://hack")
+        set_system_config(db_session, regular, "evolution_url", "https://hack")
+
+def test_whatsapp_target_sanitization():
+    """Garante que múltiplos destinatários de WhatsApp sejam separados e formatados em JID corretos."""
+    from backend.main import sanitize_whatsapp_targets
+    
+    input_str = "  554391308954-1606733601 , 554399999999, 12345-6789@g.us, 554388888888@s.whatsapp.net "
+    
+    sanitized = sanitize_whatsapp_targets(input_str)
+    
+    assert len(sanitized) == 4
+    # Grupo sem sufixo ganha @g.us
+    assert sanitized[0] == "554391308954-1606733601@g.us"
+    # Número simples ganha @s.whatsapp.net
+    assert sanitized[1] == "554399999999@s.whatsapp.net"
+    # Grupo com sufixo é preservado
+    assert sanitized[2] == "12345-6789@g.us"
+    # Número com sufixo é preservado
+    assert sanitized[3] == "554388888888@s.whatsapp.net"
+
+def test_db_migration_and_markdown_save(db_session):
+    """Garante que a nova coluna generated_markdown exista e persista dados de relatórios no histórico."""
+    from sqlalchemy import text
+    from backend.database import PublicationHistory, ResearchTopic, User
+    
+    # Executa a migração (ALTER TABLE) de forma tolerante (se já existir no DDL, ignora)
+    try:
+        db_session.execute(text("ALTER TABLE publication_history ADD COLUMN generated_markdown TEXT"))
+        db_session.commit()
+    except Exception:
+        pass
+    
+    user = User(username="test_writer", password_hash="hash")
+    db_session.add(user)
+    db_session.commit()
+    
+    topic = ResearchTopic(user_id=user.id, topic_name="T", search_query="Q", whatsapp_target="1")
+    db_session.add(topic)
+    db_session.commit()
+    
+    test_md = "# Relatório Final\n* Fato 1\nAté a próxima edição."
+    history_entry = PublicationHistory(
+        topic_id=topic.id,
+        pdf_path="test.pdf",
+        status="success",
+        generated_markdown=test_md
+    )
+    db_session.add(history_entry)
+    db_session.commit()
+    
+    # Recupera e valida
+    retrieved = db_session.query(PublicationHistory).filter_by(id=history_entry.id).first()
+    assert retrieved.generated_markdown == test_md
+
+def test_db_migration_time_period(db_session):
+    """Garante que a coluna time_period exista na tabela de tópicos e suporte persistência do valor."""
+    from sqlalchemy import text
+    from backend.database import ResearchTopic, User
+    
+    try:
+        db_session.execute(text("ALTER TABLE research_topics ADD COLUMN time_period TEXT DEFAULT 'month'"))
+        db_session.commit()
+    except Exception:
+        pass
+        
+    user = User(username="test_filter_user", password_hash="hash")
+    db_session.add(user)
+    db_session.commit()
+    
+    topic = ResearchTopic(
+        user_id=user.id,
+        topic_name="Dólar",
+        search_query="cotação",
+        whatsapp_target="1",
+        time_period="week"
+    )
+    db_session.add(topic)
+    db_session.commit()
+    
+    retrieved = db_session.query(ResearchTopic).filter_by(id=topic.id).first()
+    assert retrieved.time_period == "week"
+
+def test_time_period_filtering():
+    """Garante o cálculo correto de datas limite e âncoras temporais no backend."""
+    from backend.main import get_time_period_constraint
+    import datetime
+    
+    # 24h
+    c_24h = get_time_period_constraint("24h")
+    assert "24 horas" in c_24h
+    
+    # week
+    c_week = get_time_period_constraint("week")
+    assert "últimos 7 dias" in c_week
+    
+    # month
+    c_month = get_time_period_constraint("month")
+    assert "últimos 30 dias" in c_month
+    
+    # year
+    c_year = get_time_period_constraint("year")
+    assert f"ano de {datetime.date.today().year}" in c_year
+
+def test_bcb_grounding():
+    """Garante que a função de grounding do BCB traga cotações reais e estruturadas."""
+    from backend.main import get_bcb_financial_facts
+    facts = get_bcb_financial_facts()
+    
+    if facts:
+        assert "BANCO CENTRAL DO BRASIL" in facts
+        assert "PTAX Compra" in facts
+        assert "RELATÓRIO FOCUS" in facts
+

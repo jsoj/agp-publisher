@@ -61,6 +61,7 @@ class ResearchTopic(Base):
     preferred_model = Column(String, default='gemini-2.5-pro')
     
     is_active = Column(Integer, default=1)
+    time_period = Column(String, default='month') # '24h', 'week', 'month', 'year'
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     
     user = relationship("User", back_populates="topics")
@@ -91,6 +92,7 @@ class PublicationHistory(Base):
     sent_at = Column(DateTime, default=datetime.datetime.utcnow)
     status = Column(String, nullable=False) # 'success' ou 'error'
     error_message = Column(String, nullable=True)
+    generated_markdown = Column(String, nullable=True)
     
     topic = relationship("ResearchTopic", back_populates="history")
 
@@ -114,6 +116,19 @@ def get_engine(db_path=None):
 
 def init_db(engine):
     Base.metadata.create_all(bind=engine)
+    
+    # Executa a migração automática para adicionar a nova coluna se já existir a tabela
+    from sqlalchemy import text
+    with engine.begin() as conn:
+        try:
+            conn.execute(text("ALTER TABLE publication_history ADD COLUMN generated_markdown TEXT"))
+        except Exception:
+            pass
+            
+        try:
+            conn.execute(text("ALTER TABLE research_topics ADD COLUMN time_period TEXT DEFAULT 'month'"))
+        except Exception:
+            pass
 
 def get_session_factory(engine):
     return sessionmaker(autocommit=False, autoflush=False, bind=engine)

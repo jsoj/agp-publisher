@@ -340,14 +340,24 @@ async function loadHistoryData() {
     if (history && history.length > 0) {
       history.reverse().forEach(h => {
         const tr = document.createElement("tr");
+        
+        // Botões de ação com encode seguro do markdown para o preview
+        let actionsHtml = '-';
+        if (h.status === 'success') {
+          const pdfBtn = `<a href="/${h.pdf_path}" target="_blank" class="btn-icon" style="text-decoration: none; width: auto; display: inline-flex; gap: 0.25rem; font-size: 0.8rem; padding: 0.35rem 0.75rem;">📥 PDF</a>`;
+          const previewBtn = h.generated_markdown ? `<button class="btn-icon" style="width: auto; display: inline-flex; gap: 0.25rem; font-size: 0.8rem; padding: 0.35rem 0.75rem; background: var(--secondary-color);" onclick="showReportPreview(\`${encodeURIComponent(h.generated_markdown)}\`)">🔍 Ver Conteúdo</button>` : '';
+          actionsHtml = `<div style="display: flex; gap: 0.5rem; align-items: center;">${pdfBtn} ${previewBtn}</div>`;
+        } else if (h.generated_markdown) {
+          // Permite ver o rascunho mesmo se houve erro de envio de WhatsApp
+          actionsHtml = `<button class="btn-icon" style="width: auto; display: inline-flex; gap: 0.25rem; font-size: 0.8rem; padding: 0.35rem 0.75rem; background: var(--secondary-color);" onclick="showReportPreview(\`${encodeURIComponent(h.generated_markdown)}\`)">🔍 Ver Rascunho</button>`;
+        }
+        
         tr.innerHTML = `
           <td><strong>${h.topic_name || "Daily AI Group"}</strong></td>
           <td>${new Date(h.sent_at).toLocaleString("pt-BR")}</td>
           <td><span class="status-badge ${h.status === 'success' ? 'status-success' : 'status-error'}">${h.status}</span></td>
           <td><small style="color: var(--text-muted);">${h.error_message || "Enviado com sucesso"}</small></td>
-          <td>
-            ${h.status === 'success' ? `<a href="/${h.pdf_path}" target="_blank" class="btn-icon" style="text-decoration: none; width: auto; display: inline-flex; gap: 0.25rem; font-size: 0.8rem; padding: 0.35rem 0.75rem;">📥 Baixar PDF</a>` : '-'}
-          </td>
+          <td>${actionsHtml}</td>
         `;
         tbody.appendChild(tr);
       });
@@ -358,6 +368,25 @@ async function loadHistoryData() {
     console.error("Erro ao buscar histórico:", err);
   }
 }
+
+// Abre o modal e renderiza o markdown gerado pelo Gemini
+window.showReportPreview = function(encodedMarkdown) {
+  try {
+    const markdownText = decodeURIComponent(encodedMarkdown);
+    const modalBody = document.getElementById("preview-modal-body");
+    
+    // Converte Markdown em HTML usando a biblioteca 'marked' (carregada via CDN)
+    if (window.marked && typeof window.marked.parse === 'function') {
+      modalBody.innerHTML = window.marked.parse(markdownText);
+    } else {
+      modalBody.innerHTML = `<pre style="white-space: pre-wrap; font-family: inherit;">${markdownText}</pre>`;
+    }
+    
+    openModal("preview-modal");
+  } catch (e) {
+    console.error("Erro ao abrir preview do relatório:", e);
+  }
+};
 
 async function loadAdminData() {
   await fetchSystemConfig();
@@ -426,6 +455,7 @@ function openEditTopicModal(topic) {
   document.getElementById("topic-query").value = topic.search_query;
   document.getElementById("topic-target").value = topic.whatsapp_target;
   document.getElementById("topic-model").value = topic.preferred_model;
+  document.getElementById("topic-period").value = topic.time_period || "month";
   document.getElementById("topic-custom-key").value = topic.custom_gemini_key || "";
   
   const typeSelect = document.getElementById("topic-schedule-type");
@@ -598,7 +628,8 @@ function setupEventListeners() {
       schedule_type: document.getElementById("topic-schedule-type").value,
       fixed_time: document.getElementById("topic-fixed-time").value,
       random_range_start: document.getElementById("topic-range-start").value,
-      random_range_end: document.getElementById("topic-range-end").value
+      random_range_end: document.getElementById("topic-range-end").value,
+      time_period: document.getElementById("topic-period").value
     };
 
     try {
