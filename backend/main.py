@@ -278,8 +278,8 @@ def run_topic_pipeline(topic_id: int):
         3. Adicione o link do grupo: "🔗 **Grupo de WhatsApp:** [Acesse aqui]({link_group})"
         4. Adicione a data atual: "**Data:** {datetime.date.today().strftime('%d/%m/%Y')}"
         5. NÃO escreva "De:" nem "Para:" ou "Memorando". Vá direto para o "Assunto" e o conteúdo.
-        6. O texto deve ser excelente, cobrindo as notícias com base nos dados fornecidos.
-        7. No final do documento, você DEVE listar todas as Referências de pesquisa (links e fontes).
+        6. O texto deve ser excelente, cobrindo as notícias com base nos dados fornecidos. Para cada notícia ou anúncio de mercado citado, inclua a data de publicação original no formato [dd/mm/aa] (exemplo: "[28/06/26]") logo no início do fato ou parágrafo correspondente.
+        7. No final do documento, sob o cabeçalho "## Referências", liste todas as fontes de pesquisa de maneira organizada. Cada item deve conter a data [dd/mm/aa], o nome da fonte/veículo e o link/URL original exato clicável em formato de link Markdown (exemplo: `* **[Nome do Veículo - dd/mm/aa]**: Breve resumo do fato - [Link da Notícia](URL)`). NUNCA remova ou oculte as URLs originais da pesquisa.
         8. Ao criar tabelas em Markdown (como cotações PTAX ou projeções Focus), certifique-se de que cada linha da tabela (cabeçalho, separador e cada linha de dados) esteja em uma LINHA FÍSICA SEPARADA com quebras de linha normais (\n). NUNCA junte ou colapse várias linhas de tabela em um único parágrafo contínuo.
         
         DADOS BRUTOS:
@@ -300,7 +300,7 @@ def run_topic_pipeline(topic_id: int):
         Você é um Revisor e Auditor Sênior Rigoroso.
         Revise o seguinte rascunho de relatório de acordo com estas REGRAS ABSOLUTAS:
         1. NUNCA inicie uma frase ou parágrafo com o pronome oblíquo "Me", "Te", "Se", "Nos" ou "Vos".
-        2. Mantenha todas as fontes, links de referências e citações. É vital que as fontes apareçam no documento final.
+        2. Mantenha todas as fontes, links de referências e citações de links originais. É vital que as referências no final do documento sob "## Referências" contenham a data no formato [dd/mm/aa] e a URL exata clicável em formato Markdown (ex: `[Link da Notícia](URL)`). Se o rascunho omitiu os links clicáveis originais obtidos na coleta de dados, você DEVE recuperá-los e reinseri-los.
         3. Mantenha os cabeçalhos exatos: "# I.A. Nível 01 - {topic.topic_name}", o subtítulo de telefone e a Data. NUNCA adicione blocos como "De/Para".
         4. O relatório DEVE terminar OBRIGATORIAMENTE com a seguinte frase exata e isolada no final: "Até a próxima edição."
         5. Garanta que todas as tabelas em Markdown estejam perfeitamente formatadas com quebras de linha físicas normais para cada linha de dados (cabeçalho, separador e linhas de conteúdo). NUNCA permita que tabelas fiquem colapsadas em uma única linha horizontal com barras duplas (||). Se encontrar, quebre-as em linhas separadas.
