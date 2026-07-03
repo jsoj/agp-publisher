@@ -160,7 +160,7 @@ def get_bcb_financial_facts() -> str:
     # 1. Busca PTAX recente do Dólar
     try:
         today = datetime.date.today()
-        start_date = today - datetime.timedelta(days=10)
+        start_date = today - datetime.timedelta(days=15)
         start_str = start_date.strftime('%m-%d-%Y')
         end_str = today.strftime('%m-%d-%Y')
         url_ptax = f"https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/CotacaoDolarPeriodo(dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)?@dataInicial='{start_str}'&@dataFinalCotacao='{end_str}'&$format=json"
@@ -170,13 +170,15 @@ def get_bcb_financial_facts() -> str:
             quotes = data.get('value', [])
             if quotes:
                 facts.append("--- DADOS DE COTAÇÃO OFICIAL PTAX DO DÓLAR (FONTE: BANCO CENTRAL DO BRASIL) ---")
+                facts.append("| Data | PTAX Compra | PTAX Venda |")
+                facts.append("| :--- | :--- | :--- |")
                 for q in reversed(quotes):
                     dt_str = q.get('dataHoraCotacao', '')
                     if dt_str:
                         dt_formatted = datetime.datetime.strptime(dt_str.split('.')[0], '%Y-%m-%d %H:%M:%S').strftime('%d/%m/%Y')
                     else:
                         dt_formatted = "N/A"
-                    facts.append(f"- Data: {dt_formatted} | PTAX Compra: {q.get('cotacaoCompra'):.4f} | PTAX Venda: {q.get('cotacaoVenda'):.4f}")
+                    facts.append(f"| {dt_formatted} | R$ {q.get('cotacaoCompra'):.4f} | R$ {q.get('cotacaoVenda'):.4f} |")
                 facts.append("---------------------------------------------------------------------------------")
     except Exception as e:
         print(f"⚠️ Erro ao obter dados PTAX do BCB: {e}")
@@ -191,17 +193,20 @@ def get_bcb_financial_facts() -> str:
             if entries:
                 facts.append("--- CONSENSO DE EXPECTATIVAS DE CÂMBIO - RELATÓRIO FOCUS (FONTE: BANCO CENTRAL) ---")
                 latest_report_date = entries[0].get('Data')
-                facts.append(f"Data de Divulgação do Relatório Focus: {datetime.datetime.strptime(latest_report_date, '%Y-%m-%d').strftime('%d/%m/%Y')}")
+                latest_report_formatted = datetime.datetime.strptime(latest_report_date, '%Y-%m-%d').strftime('%d/%m/%Y')
+                facts.append(f"Data de Divulgação do Relatório Focus: {latest_report_formatted}")
+                facts.append("| Período | Projeção Média | Projeção Mediana |")
+                facts.append("| :--- | :--- | :--- |")
                 for e in entries:
                     # Filtra apenas baseCalculo 0 para evitar duplicidade de projeções no mesmo ano
                     if e.get('Data') == latest_report_date and e.get('baseCalculo') == 0:
-                        facts.append(f"- Projeção para Fim de {e.get('DataReferencia')}: Média: R$ {e.get('Media'):.4f} | Mediana: R$ {e.get('Mediana'):.4f}")
+                        facts.append(f"| Fim de {e.get('DataReferencia')} | R$ {e.get('Media'):.4f} | R$ {e.get('Mediana'):.4f} |")
                 facts.append("---------------------------------------------------------------------------------")
     except Exception as e:
         print(f"⚠️ Erro ao obter dados Focus do BCB: {e}")
 
     if facts:
-        facts.append("IMPORTANTE (REQUISITO DE ACURÁCIA): Ao escrever ou auditar o relatório, você DEVE utilizar estritamente e exatamente os valores de cotação PTAX e projeções do Relatório Focus listados acima caso vá mencionar esses dados. NUNCA tente deduzir, alucinar ou citar valores diferentes para essas datas/períodos de referência.")
+        facts.append("IMPORTANTE (REQUISITO DE ACURÁCIA): Ao escrever ou auditar o relatório, você DEVE copiar e utilizar estritamente e exatamente as tabelas de cotação PTAX e projeções do Relatório Focus listadas acima (copiando exatamente o formato de tabela Markdown fornecido, linha por linha). NUNCA altere sua estrutura, remova quebras de linha ou tente reconstruí-las de outra forma.")
         return "\n".join(facts)
     return ""
 
@@ -279,8 +284,8 @@ def run_topic_pipeline(topic_id: int):
         4. Adicione a data atual: "**Data:** {datetime.date.today().strftime('%d/%m/%Y')}"
         5. NÃO escreva "De:" nem "Para:" ou "Memorando". Vá direto para o "Assunto" e o conteúdo.
         6. O texto deve ser excelente, cobrindo as notícias com base nos dados fornecidos. Para cada notícia ou anúncio de mercado citado, inclua a data de publicação original no formato [dd/mm/aa] (exemplo: "[28/06/26]") logo no início do fato ou parágrafo correspondente.
-        7. No final do documento, sob o cabeçalho "## Referências", liste todas as fontes de pesquisa de maneira organizada. Cada item deve conter a data [dd/mm/aa], o nome da fonte/veículo e o link/URL original exato clicável em formato de link Markdown (exemplo: `* **[Nome do Veículo - dd/mm/aa]**: Breve resumo do fato - [Link da Notícia](URL)`). NUNCA remova ou oculte as URLs originais da pesquisa.
-        8. Ao criar tabelas em Markdown (como cotações PTAX ou projeções Focus), certifique-se de que cada linha da tabela (cabeçalho, separador e cada linha de dados) esteja em uma LINHA FÍSICA SEPARADA com quebras de linha normais (\n). NUNCA junte ou colapse várias linhas de tabela em um único parágrafo contínuo.
+        7. No final do documento, sob o cabeçalho "## Referências", liste todas as fontes de pesquisa de maneira organizada. Cada referência deve conter a data [dd/mm/aa], o nome da fonte/veículo e o link/URL original clicável em formato Markdown (exemplo: `* **[Nome do Veículo - dd/mm/aa]**: Breve resumo do fato - [Link da Notícia](URL)`). IMPORTANTE: Use APENAS URLs completas que foram fornecidas explicitamente nos resultados de pesquisa. NUNCA tente inventar, adivinhar ou deduzir caminhos de URL (como caminhos de página como `/currency/dxy`). Se o link completo e exato não estiver nos resultados de busca, use apenas a URL do domínio principal confirmado (exemplo: `https://tradingeconomics.com`) ou omita o link para evitar erros 404.
+        8. Para tabelas oficiais (como cotações PTAX e projeções Focus), você DEVE copiar e colar as tabelas em Markdown fornecidas nos DADOS BRUTOS exatamente como estão, preservando perfeitamente a sua estrutura de linhas, colunas, delimitadores e quebras de linha física (\n). Nunca altere seu formato ou tente colapsá-las.
         
         DADOS BRUTOS:
         {raw_data}
@@ -300,10 +305,10 @@ def run_topic_pipeline(topic_id: int):
         Você é um Revisor e Auditor Sênior Rigoroso.
         Revise o seguinte rascunho de relatório de acordo com estas REGRAS ABSOLUTAS:
         1. NUNCA inicie uma frase ou parágrafo com o pronome oblíquo "Me", "Te", "Se", "Nos" ou "Vos".
-        2. Mantenha todas as fontes, links de referências e citações de links originais. É vital que as referências no final do documento sob "## Referências" contenham a data no formato [dd/mm/aa] e a URL exata clicável em formato Markdown (ex: `[Link da Notícia](URL)`). Se o rascunho omitiu os links clicáveis originais obtidos na coleta de dados, você DEVE recuperá-los e reinseri-los.
+        2. Mantenha todas as fontes, links de referências e citações de links originais. É vital que as referências no final do documento sob "## Referências" contenham a data no formato [dd/mm/aa] e a URL exata clicável em formato Markdown. NUNCA permita links com caminhos/paths de URL inventados ou adivinhados. Se uma URL parecer fictícia ou modificada, substitua-a pelo domínio raiz correspondente da fonte (exemplo: `https://tradingeconomics.com`).
         3. Mantenha os cabeçalhos exatos: "# I.A. Nível 01 - {topic.topic_name}", o subtítulo de telefone e a Data. NUNCA adicione blocos como "De/Para".
         4. O relatório DEVE terminar OBRIGATORIAMENTE com a seguinte frase exata e isolada no final: "Até a próxima edição."
-        5. Garanta que todas as tabelas em Markdown estejam perfeitamente formatadas com quebras de linha físicas normais para cada linha de dados (cabeçalho, separador e linhas de conteúdo). NUNCA permita que tabelas fiquem colapsadas em uma única linha horizontal com barras duplas (||). Se encontrar, quebre-as em linhas separadas.
+        5. Garanta que todas as tabelas em Markdown estejam perfeitamente formatadas com quebras de linha físicas normais para cada linha de dados (cabeçalho, separador e linhas de conteúdo). NUNCA permita que tabelas fiquem colapsadas em uma única linha horizontal. As tabelas oficiais do BCB PTAX e do Relatório Focus devem seguir exatamente a mesma estrutura enviada nos dados brutos.
         
         RASCUNHO:
         {draft_text}
