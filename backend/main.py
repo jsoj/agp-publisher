@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from google import genai
+from google.genai import types
 import requests
 import base64
 import markdown
@@ -244,7 +245,10 @@ def run_topic_pipeline(topic_id: int):
         """
         response_collector = client.models.generate_content(
             model=model,
-            contents=collector_prompt
+            contents=collector_prompt,
+            config=types.GenerateContentConfig(
+                tools=[types.Tool(google_search=types.GoogleSearch())]
+            )
         )
         raw_data = response_collector.text
         
