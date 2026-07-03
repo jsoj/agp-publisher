@@ -24,6 +24,6 @@ RUN mkdir -p /app/data
 ENV PYTHONUNBUFFERED=1
 ENV DATABASE_PATH=/app/data/agp_database.db
 
-EXPOSE 8000
+EXPOSE 8080
 
 CMD ["python", "-m", "backend.main"]

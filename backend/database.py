@@ -166,3 +166,21 @@ def seed_db(session, default_admin_password_hash):
         
     session.commit()
 
+    # Seed do tópico core "I.A." sob o usuário administrador para gerenciamento dinâmico
+    admin_user = session.query(User).filter_by(role="admin").first()
+    if admin_user:
+        existing_topic = session.query(ResearchTopic).filter_by(topic_name="I.A.").first()
+        if not existing_topic:
+            core_topic = ResearchTopic(
+                user_id=admin_user.id,
+                topic_name="I.A.",
+                search_query="lançamentos de novos modelos de IA, novas aplicações, movimentações de mercado das empresas de Inteligência Artificial e novidades do ecossistema Open Source de IA",
+                whatsapp_target=os.environ.get("WHATSAPP_GROUP_ID", "120363410789564152@g.us"),
+                schedule_type="fixed",
+                fixed_time="08:00",
+                time_period="week",  # filtro semanal para trazer dados sempre recentes!
+                is_active=1
+            )
+            session.add(core_topic)
+            session.commit()
+
