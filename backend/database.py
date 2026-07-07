@@ -1,6 +1,6 @@
 import os
 import datetime
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Float, ForeignKey
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Float, ForeignKey, Table
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 
 Base = declarative_base()
@@ -8,6 +8,14 @@ Base = declarative_base()
 # ==========================================
 # MODELOS DE DADOS DO BANCO (SQLAlchemy)
 # ==========================================
+
+# Tabela M2M para vincular tópicos a grupos de e-mail
+topic_email_groups = Table(
+    'topic_email_groups',
+    Base.metadata,
+    Column('topic_id', Integer, ForeignKey('research_topics.id', ondelete="CASCADE"), primary_key=True),
+    Column('group_id', Integer, ForeignKey('email_groups.id', ondelete="CASCADE"), primary_key=True)
+)
 
 class User(Base):
     __tablename__ = 'users'
@@ -33,12 +41,57 @@ class User(Base):
     
     topics = relationship("ResearchTopic", back_populates="user", cascade="all, delete-orphan")
     token_logs = relationship("TokenLog", back_populates="user", cascade="all, delete-orphan")
+    email_groups = relationship("EmailGroup", back_populates="user", cascade="all, delete-orphan")
 
 class SystemConfig(Base):
     __tablename__ = 'system_config'
     
     key = Column(String, primary_key=True)
     value = Column(String, nullable=True)
+
+class AIModelConfig(Base):
+    __tablename__ = 'ai_model_configs'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    provider = Column(String, nullable=False) # 'gemini', 'openai', 'anthropic', 'deepseek', etc.
+    model_name = Column(String, nullable=False) # ex: 'gemini-2.5-pro'
+    api_key = Column(String, nullable=False)
+    base_url = Column(String, nullable=True)
+    is_active = Column(Boolean, default=True)
+
+class EmailGroup(Base):
+    __tablename__ = 'email_groups'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    name = Column(String, nullable=False)
+    description = Column(String, nullable=True)
+    
+    user = relationship("User", back_populates="email_groups")
+    contacts = relationship("EmailContact", back_populates="group", cascade="all, delete-orphan")
+    topics = relationship("ResearchTopic", secondary=topic_email_groups, back_populates="email_groups")
+
+class EmailContact(Base):
+    __tablename__ = 'email_contacts'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    group_id = Column(Integer, ForeignKey('email_groups.id', ondelete="CASCADE"), nullable=False)
+    name = Column(String, nullable=False)
+    email = Column(String, nullable=False)
+    
+    group = relationship("EmailGroup", back_populates="contacts")
+
+class TopicSubscription(Base):
+    __tablename__ = 'topic_subscriptions'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    topic_id = Column(Integer, ForeignKey('research_topics.id', ondelete="CASCADE"), nullable=False)
+    delivery_type = Column(String, nullable=False) # 'whatsapp' ou 'email'
+    target = Column(String, nullable=False) # e-mail ou telefone
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    
+    topic = relationship("ResearchTopic", back_populates="public_subscriptions")
 
 class ResearchTopic(Base):
     __tablename__ = 'research_topics'
@@ -55,18 +108,32 @@ class ResearchTopic(Base):
     random_range_start = Column(String, nullable=True) # "HH:MM"
     random_range_end = Column(String, nullable=True) # "HH:MM"
     days_of_week = Column(String, nullable=True) # "1,2,3,4,5"
+    schedule_interval = Column(String, default='daily') # 'daily', 'weekly', 'biweekly', 'monthly'
+    schedule_days = Column(String, nullable=True) # "1,3,5" para Seg, Qua, Sex
     
-    # BYOK
+    # Datas específicas (One-Shot)
+    date_range_start = Column(String, nullable=True) # YYYY-MM-DD
+    date_range_end = Column(String, nullable=True) # YYYY-MM-DD
+    
+    # Modelos por Etapa
+    collector_model_id = Column(Integer, ForeignKey('ai_model_configs.id'), nullable=True)
+    writer_model_id = Column(Integer, ForeignKey('ai_model_configs.id'), nullable=True)
+    auditor_model_id = Column(Integer, ForeignKey('ai_model_configs.id'), nullable=True)
+    
+    # BYOK e modelo legado (mantidos para compatibilidade)
     custom_gemini_key = Column(String, nullable=True)
     preferred_model = Column(String, default='gemini-2.5-pro')
     
     is_active = Column(Integer, default=1)
+    is_public = Column(Integer, default=0) # 1 para permitir auto-inscrição pública
     time_period = Column(String, default='month') # '24h', 'week', 'month', 'year'
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     
     user = relationship("User", back_populates="topics")
     token_logs = relationship("TokenLog", back_populates="topic")
     history = relationship("PublicationHistory", back_populates="topic", cascade="all, delete-orphan")
+    email_groups = relationship("EmailGroup", secondary=topic_email_groups, back_populates="topics")
+    public_subscriptions = relationship("TopicSubscription", back_populates="topic", cascade="all, delete-orphan")
 
 class TokenLog(Base):
     __tablename__ = 'token_logs'
@@ -129,6 +196,22 @@ def init_db(engine):
             conn.execute(text("ALTER TABLE research_topics ADD COLUMN time_period TEXT DEFAULT 'month'"))
         except Exception:
             pass
+            
+        # Novas migrações para evolução SaaS
+        for col, col_type in [
+            ("schedule_interval", "TEXT DEFAULT 'daily'"),
+            ("schedule_days", "TEXT"),
+            ("date_range_start", "TEXT"),
+            ("date_range_end", "TEXT"),
+            ("collector_model_id", "INTEGER"),
+            ("writer_model_id", "INTEGER"),
+            ("auditor_model_id", "INTEGER"),
+            ("is_public", "INTEGER DEFAULT 0")
+        ]:
+            try:
+                conn.execute(text(f"ALTER TABLE research_topics ADD COLUMN {col} {col_type}"))
+            except Exception:
+                pass
 
 def get_session_factory(engine):
     return sessionmaker(autocommit=False, autoflush=False, bind=engine)

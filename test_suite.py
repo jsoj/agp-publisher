@@ -332,4 +332,31 @@ def test_bcb_grounding():
         assert "BANCO CENTRAL DO BRASIL" in facts
         assert "PTAX Compra" in facts
         assert "RELATÓRIO FOCUS" in facts
+
+def test_saas_features_models_and_emails(db_session):
+    """Garante o funcionamento do banco para os novos modelos de IA, grupos de e-mail e auto-inscrições."""
+    from backend.database import AIModelConfig, EmailGroup, EmailContact, TopicSubscription
+    
+    model_cfg = AIModelConfig(provider="openai", model_name="gpt-4o", api_key="sk-test", base_url="https://api.openai.com/v1")
+    db_session.add(model_cfg)
+    db_session.commit()
+    assert model_cfg.id is not None
+    
+    group = EmailGroup(user_id=1, name="Test Group", description="Desc")
+    db_session.add(group)
+    db_session.commit()
+    
+    contact = EmailContact(group_id=group.id, name="Test User", email="test@domain.com")
+    db_session.add(contact)
+    db_session.commit()
+    
+    assert len(group.contacts) == 1
+    assert group.contacts[0].email == "test@domain.com"
+    
+    sub = TopicSubscription(topic_id=1, delivery_type="email", target="subscriber@domain.com")
+    db_session.add(sub)
+    db_session.commit()
+    
+    assert sub.id is not None
+    assert sub.target == "subscriber@domain.com"
 

@@ -9,6 +9,12 @@
 </head>
 <body>
 
+  <!-- HEADER MÓVEL (MOBILE ONLY) -->
+  <header class="mobile-header">
+    <button id="sidebar-toggle" class="hamburger-btn">☰</button>
+    <span class="mobile-brand" id="mobile-company-name">AGP Publisher</span>
+  </header>
+
   <!-- ==========================================
        TELA DE LOGIN / REGISTRO
        ========================================== -->
@@ -57,6 +63,11 @@
         </a>
       </li>
       <li>
+        <a href="#" class="menu-item" data-target="emails-page">
+          <span>📧</span> Contatos & E-mails
+        </a>
+      </li>
+      <li>
         <a href="#" class="menu-item" data-target="whatsapp-page">
           <span>💬</span> Conexão WhatsApp
         </a>
@@ -67,8 +78,13 @@
         </a>
       </li>
       <li class="admin-only" style="display: none;">
+        <a href="#" class="menu-item" data-target="models-page">
+          <span>🤖</span> Provedores de IA
+        </a>
+      </li>
+      <li class="admin-only" style="display: none;">
         <a href="#" class="menu-item" data-target="admin-page">
-          <span>⚙️</span> Painel Admin
+          <span>⚙---</span> Painel Admin
         </a>
       </li>
       <li style="margin-top: auto;">
@@ -158,8 +174,8 @@
               <tr>
                 <th>Nome do Tópico</th>
                 <th>WhatsApp Destino</th>
-                <th>Agendamento</th>
-                <th>Modelo</th>
+                <th>Recorrência</th>
+                <th>Modelos (C/R/A)</th>
                 <th>Status</th>
                 <th>Ações</th>
               </tr>
@@ -174,7 +190,63 @@
       </div>
     </section>
 
-    <!-- PÁGINA 3: CONEXÃO WHATSAPP -->
+    <!-- PÁGINA 3: EMAILS E CONTATOS -->
+    <section id="emails-page" class="page-section">
+      <div class="page-header">
+        <h1>Contatos & Listas de E-mail</h1>
+        <button class="btn-primary" id="btn-add-email-group" style="width: auto; padding: 0.6rem 1.2rem;">
+          <span>+ Novo Grupo de E-mail</span>
+        </button>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 1.5rem; margin-bottom: 2rem;">
+        <div class="card">
+          <h3 class="card-title">Grupos de Contatos</h3>
+          <div class="data-table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Grupo</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="email-groups-table-body">
+                <tr>
+                  <td colspan="2" style="text-align: center; color: var(--text-muted);">Nenhum grupo de e-mail registrado.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
+        <div class="card" id="contacts-card" style="display: none;">
+          <div class="page-header" style="margin-bottom: 1rem;">
+            <h3 class="card-title" id="active-group-title" style="margin-bottom: 0;">Membros do Grupo</h3>
+            <button class="btn-primary" id="btn-add-email-contact" style="width: auto; padding: 0.4rem 0.8rem; font-size: 0.85rem;">
+              <span>+ Adicionar E-mail</span>
+            </button>
+          </div>
+          <div class="data-table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>E-mail</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="email-contacts-table-body">
+                <tr>
+                  <td colspan="3" style="text-align: center; color: var(--text-muted);">Selecione um grupo para visualizar os contatos.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PÁGINA 4: CONEXÃO WHATSAPP -->
     <section id="whatsapp-page" class="page-section">
       <div class="page-header">
         <h1>Conexão WhatsApp</h1>
@@ -197,7 +269,7 @@
       </div>
     </section>
 
-    <!-- PÁGINA 4: HISTÓRICO & PDFS -->
+    <!-- PÁGINA 5: HISTÓRICO & PDFS -->
     <section id="history-page" class="page-section">
       <div class="page-header">
         <h1>Histórico de Relatórios</h1>
@@ -225,14 +297,45 @@
       </div>
     </section>
 
-    <!-- PÁGINA 5: PAINEL ADMINISTRATIVO -->
+    <!-- PÁGINA 6: CONFIGURAÇÃO DE MODELOS DE IA (ADMIN ONLY) -->
+    <section id="models-page" class="page-section">
+      <div class="page-header">
+        <h1>Modelos de IA & Provedores</h1>
+        <button class="btn-primary" id="btn-add-model-config" style="width: auto; padding: 0.6rem 1.2rem;">
+          <span>+ Cadastrar Modelo</span>
+        </button>
+      </div>
+
+      <div class="card">
+        <div class="data-table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Provedor</th>
+                <th>Modelo</th>
+                <th>Endpoint Base</th>
+                <th>Status</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="models-table-body">
+              <tr>
+                <td colspan="5" style="text-align: center; color: var(--text-muted);">Carregando provedores...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- PÁGINA 7: PAINEL ADMINISTRATIVO -->
     <section id="admin-page" class="page-section">
       <div class="page-header">
         <h1>Painel de Administração</h1>
       </div>
 
       <div class="card">
-        <h3 class="card-title">Configurações Gerais (White-Label)</h3>
+        <h3 class="card-title">Configurações Gerais (White-Label & SMTP)</h3>
         <form id="admin-config-form">
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
             <div class="form-group">
@@ -298,6 +401,34 @@
             </div>
           </div>
 
+          <h4 style="margin-top: 2rem; margin-bottom: 1rem; color: var(--primary);">Servidor SMTP de E-mail</h4>
+          <div style="display: grid; grid-template-columns: 1.5fr 0.5fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+            <div class="form-group">
+              <label for="admin-smtp-host">Host SMTP</label>
+              <input type="text" id="admin-smtp-host" class="form-input" placeholder="smtp.gmail.com">
+            </div>
+            <div class="form-group">
+              <label for="admin-smtp-port">Porta SMTP</label>
+              <input type="number" id="admin-smtp-port" class="form-input" value="587">
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+            <div class="form-group">
+              <label for="admin-smtp-user">Usuário SMTP / E-mail</label>
+              <input type="email" id="admin-smtp-user" class="form-input" placeholder="seu-email@gmail.com">
+            </div>
+            <div class="form-group">
+              <label for="admin-smtp-pass">Senha SMTP</label>
+              <input type="password" id="admin-smtp-pass" class="form-input" placeholder="Senha de aplicativo">
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 2rem;">
+            <label for="admin-smtp-sender">E-mail do Remetente (Opcional)</label>
+            <input type="email" id="admin-smtp-sender" class="form-input" placeholder="remetente@empresa.com">
+          </div>
+
           <button type="submit" class="btn-primary" style="width: auto; padding: 0.6rem 2rem;">
             <span>Salvar Configurações</span>
           </button>
@@ -347,9 +478,18 @@
       <form id="topic-form">
         <input type="hidden" id="topic-id-hidden">
         
-        <div class="form-group">
-          <label for="topic-name">Nome Amigável do Tópico</label>
-          <input type="text" id="topic-name" class="form-input" required placeholder="Ex: Agricultura e IA">
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem;">
+          <div class="form-group">
+            <label for="topic-name">Nome do Tópico</label>
+            <input type="text" id="topic-name" class="form-input" required placeholder="Ex: Agricultura e IA">
+          </div>
+          <div class="form-group">
+            <label for="topic-is-public">Tópico Público?</label>
+            <select id="topic-is-public" class="form-input">
+              <option value="0">Não (Restrito)</option>
+              <option value="1">Sim (Auto-Inscrição)</option>
+            </select>
+          </div>
         </div>
         
         <div class="form-group">
@@ -359,39 +499,100 @@
         
         <div class="form-group">
           <label for="topic-target">WhatsApp Destino (Número com DDI ou ID do Grupo)</label>
-          <input type="text" id="topic-target" class="form-input" required placeholder="Ex: 554391308954-1606733601">
+          <input type="text" id="topic-target" class="form-input" placeholder="Ex: 554391308954-1606733601">
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
           <div class="form-group">
-            <label for="topic-model">Modelo de Preferência</label>
+            <label for="topic-period">Período Padrão de Cobertura</label>
+            <select id="topic-period" class="form-input">
+              <option value="24h">Últimas 24 Horas</option>
+              <option value="week">Última Semana</option>
+              <option value="month" selected>Último Mês</option>
+              <option value="year">Ano de 2026</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="topic-model">Modelo de Legado (Gemini)</label>
             <select id="topic-model" class="form-input">
               <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
               <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
             </select>
           </div>
+        </div>
+
+        <!-- Cobertura Customizada (One-Shot) -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
           <div class="form-group">
-            <label for="topic-period">Período de Pesquisa (Filtro Temporal)</label>
-            <select id="topic-period" class="form-input">
-              <option value="24h">Últimas 24 Horas</option>
-              <option value="week">Última Semana</option>
-              <option value="month" selected>Último Mês</option>
-              <option value="year">Ano Atual (2026)</option>
+            <label for="topic-date-start">Data Início Customizada (Opcional)</label>
+            <input type="date" id="topic-date-start" class="form-input">
+          </div>
+          <div class="form-group">
+            <label for="topic-date-end">Data Fim Customizada (Opcional)</label>
+            <input type="date" id="topic-date-end" class="form-input">
+          </div>
+        </div>
+
+        <!-- Seleção de IA por Etapa (SaaS) -->
+        <h4 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--primary);">Modelos por Etapa</h4>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+          <div class="form-group">
+            <label for="topic-collector-model">Coleta / Pesquisa</label>
+            <select id="topic-collector-model" class="form-input">
+              <option value="">Nativo (Gemini)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="topic-writer-model">Redator</label>
+            <select id="topic-writer-model" class="form-input">
+              <option value="">Nativo (Gemini)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="topic-auditor-model">Auditor</label>
+            <select id="topic-auditor-model" class="form-input">
+              <option value="">Nativo (Gemini)</option>
             </select>
           </div>
         </div>
 
+        <!-- Vinculação a Grupos de E-mail -->
         <div class="form-group">
-          <label for="topic-custom-key">Gemini Key (Opcional - BYOK)</label>
-          <input type="password" id="topic-custom-key" class="form-input" placeholder="Chave do Usuário">
+          <label>Vincular Grupos de E-mail para Envio Automático</label>
+          <div id="topic-email-groups-list" style="max-height: 120px; overflow-y: auto; border: 1px solid var(--border); padding: 0.5rem; border-radius: 6px; display: flex; flex-direction: column; gap: 0.4rem;">
+            <!-- Renderizado dinamicamente via JS -->
+            <span style="color: var(--text-muted); font-size: 0.85rem;">Carregando listas de e-mail...</span>
+          </div>
         </div>
 
         <div class="form-group">
-          <label for="topic-schedule-type">Modo de Agendamento</label>
-          <select id="topic-schedule-type" class="form-input">
-            <option value="fixed">Horário Fixo Diário</option>
-            <option value="random">Agendamento Flutuante (Humano)</option>
-          </select>
+          <label for="topic-custom-key">Gemini Key (BYOK)</label>
+          <input type="password" id="topic-custom-key" class="form-input" placeholder="Chave do Usuário (opcional)">
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+          <div class="form-group">
+            <label for="topic-schedule-type">Modo de Janela</label>
+            <select id="topic-schedule-type" class="form-input">
+              <option value="fixed">Horário Fixo Diário</option>
+              <option value="random">Janela Flutuante</option>
+            </select>
+          </div>
+          <div class="form-group" id="schedule-interval-wrapper">
+            <label for="topic-schedule-interval">Recorrência</label>
+            <select id="topic-schedule-interval" class="form-input">
+              <option value="daily">Diário</option>
+              <option value="weekly">Semanal</option>
+              <option value="biweekly">Quinzenal</option>
+              <option value="monthly">Mensal</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Dias da semana ou dia do mês -->
+        <div class="form-group" id="schedule-days-wrapper">
+          <label for="topic-schedule-days" id="schedule-days-label">Dias da Semana (0-6, seg=0, ex: 0,2,4 para Seg/Qua/Sex ou Dia do Mês)</label>
+          <input type="text" id="topic-schedule-days" class="form-input" placeholder="Ex: 0,2,4 para Seg/Qua/Sex ou 15 para dia 15">
         </div>
 
         <!-- Campos de Horário Fixo -->
@@ -420,58 +621,95 @@
   </div>
 
   <!-- ==========================================
-       MODAL: USUÁRIO (CRIAR / EDITAR)
+       MODAL: PROVEDOR DE IA (CRIAR / EDITAR)
        ========================================== -->
-  <div id="user-modal" class="modal">
+  <div id="model-config-modal" class="modal">
     <div class="modal-content">
       <div class="modal-header">
-        <h3 class="modal-title" id="user-modal-title">Novo Usuário</h3>
-        <button class="close-btn" onclick="closeModal('user-modal')">&times;</button>
+        <h3 class="modal-title" id="model-config-modal-title">Novo Modelo de IA</h3>
+        <button class="close-btn" onclick="closeModal('model-config-modal')">&times;</button>
       </div>
-      <form id="user-form">
-        <input type="hidden" id="user-id-hidden">
+      <form id="model-config-form">
+        <input type="hidden" id="model-config-id-hidden">
         
         <div class="form-group">
-          <label for="user-username">Usuário</label>
-          <input type="text" id="user-username" class="form-input" required placeholder="Nome de login">
-        </div>
-        
-        <div class="form-group">
-          <label for="user-password">Senha</label>
-          <input type="password" id="user-password" class="form-input" placeholder="Digite uma senha">
-        </div>
-        
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
-          <div class="form-group">
-            <label for="user-role">Função / Papel</label>
-            <select id="user-role" class="form-input">
-              <option value="user">Usuário Comum</option>
-              <option value="admin">Administrador</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label for="user-plan">Plano</label>
-            <select id="user-plan" class="form-input">
-              <option value="free_trial">Free Trial</option>
-              <option value="pro">Pro (SaaS)</option>
-              <option value="enterprise">Enterprise</option>
-            </select>
-          </div>
+          <label for="model-config-provider">Provedor</label>
+          <select id="model-config-provider" class="form-input" required>
+            <option value="gemini">Gemini (Google)</option>
+            <option value="openai">OpenAI</option>
+            <option value="anthropic">Anthropic (Claude)</option>
+            <option value="deepseek">DeepSeek</option>
+          </select>
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
-          <div class="form-group">
-            <label for="user-max-topics">Limite de Tópicos</label>
-            <input type="number" id="user-max-topics" class="form-input" min="1" value="1">
-          </div>
-          <div class="form-group">
-            <label for="user-max-tokens">Limite Mensal de Tokens</label>
-            <input type="number" id="user-max-tokens" class="form-input" min="1000" value="100000">
-          </div>
+        <div class="form-group">
+          <label for="model-config-name">Nome do Modelo (ID exato)</label>
+          <input type="text" id="model-config-name" class="form-input" required placeholder="Ex: gpt-4o ou claude-3-5-sonnet">
+        </div>
+
+        <div class="form-group">
+          <label for="model-config-key">Chave de API (API Key)</label>
+          <input type="password" id="model-config-key" class="form-input" required placeholder="Digite a chave secreta">
+        </div>
+
+        <div class="form-group">
+          <label for="model-config-base-url">Endpoint Base (Opcional)</label>
+          <input type="url" id="model-config-base-url" class="form-input" placeholder="Ex: https://api.openai.com/v1">
         </div>
 
         <button type="submit" class="btn-primary" style="margin-top: 1.5rem;">
-          <span>Salvar Usuário</span>
+          <span>Salvar Modelo</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       MODAL: GRUPO DE EMAIL
+       ========================================== -->
+  <div id="email-group-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title" id="email-group-modal-title">Novo Grupo de E-mail</h3>
+        <button class="close-btn" onclick="closeModal('email-group-modal')">&times;</button>
+      </div>
+      <form id="email-group-form">
+        <input type="hidden" id="email-group-id-hidden">
+        <div class="form-group">
+          <label for="email-group-name">Nome do Grupo</label>
+          <input type="text" id="email-group-name" class="form-input" required placeholder="Ex: Contatos Comerciais">
+        </div>
+        <div class="form-group">
+          <label for="email-group-desc">Descrição</label>
+          <input type="text" id="email-group-desc" class="form-input" placeholder="Ex: Diretoria e contatos da contabilidade">
+        </div>
+        <button type="submit" class="btn-primary" style="margin-top: 1.5rem;">
+          <span>Salvar Grupo</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       MODAL: NOVO CONTATO DE EMAIL
+       ========================================== -->
+  <div id="email-contact-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Adicionar Contato</h3>
+        <button class="close-btn" onclick="closeModal('email-contact-modal')">&times;</button>
+      </div>
+      <form id="email-contact-form">
+        <div class="form-group">
+          <label for="email-contact-name">Nome Completo</label>
+          <input type="text" id="email-contact-name" class="form-input" required placeholder="Ex: José Junior">
+        </div>
+        <div class="form-group">
+          <label for="email-contact-email">Endereço de E-mail</label>
+          <input type="email" id="email-contact-email" class="form-input" required placeholder="Ex: jose@empresa.com">
+        </div>
+        <button type="submit" class="btn-primary" style="margin-top: 1.5rem;">
+          <span>Salvar Contato</span>
         </button>
       </form>
     </div>

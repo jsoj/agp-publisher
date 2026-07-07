@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inscrição de Relatórios Executivos - AGP Publisher</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="icon" type="image/png" href="/static/logo.png">
+  <style>
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, var(--bg-color) 0%, rgba(30, 58, 138, 0.05) 100%);
+      padding: 1.5rem;
+    }
+    .subscribe-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 1.5rem;
+      padding: 2.5rem;
+      width: 100%;
+      max-width: 500px;
+      box-shadow: var(--shadow);
+    }
+    .header-logo {
+      max-height: 50px;
+      margin-bottom: 1.5rem;
+      display: block;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .subscribe-card h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      text-align: center;
+    }
+    .subscribe-card p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-bottom: 2rem;
+      text-align: center;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="subscribe-card">
+    <img src="/static/logo.png" alt="Logo" class="header-logo" onerror="this.src='https://placehold.co/150x45/1e3a8a/ffffff?text=AGP+Publisher'">
+    <h2>Inscreva-se nos Relatórios</h2>
+    <p>Selecione um tópico de seu interesse, insira seu destino de recebimento (E-mail ou WhatsApp) e comece a receber análises diárias automatizadas.</p>
+
+    <form id="subscribe-form">
+      <div class="form-group">
+        <label for="sub-topic">Tópico de Interesse</label>
+        <select id="sub-topic" class="form-input" required>
+          <option value="">Carregando tópicos públicos...</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="sub-type">Canal de Recebimento</label>
+        <select id="sub-type" class="form-input" required>
+          <option value="email">E-mail</option>
+          <option value="whatsapp">WhatsApp</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="sub-target" id="target-label">Seu Endereço de E-mail</label>
+        <input type="text" id="sub-target" class="form-input" required placeholder="Ex: seu-email@empresa.com">
+      </div>
+
+      <button type="submit" class="btn-primary" style="margin-top: 1.5rem;">
+        <span>Assinar Canal</span>
+      </button>
+    </form>
+    
+    <div style="margin-top: 1.5rem; text-align: center; font-size: 0.85rem;">
+      <a href="/static/index.html" style="color: var(--secondary-color); text-decoration: none; font-weight: 600;">Acessar Painel Administrativo</a>
+    </div>
+  </div>
+
+  <script>
+    // Carrega White-label
+    async function loadWhiteLabel() {
+      try {
+        const res = await fetch("/api/admin/config");
+        if (res.ok) {
+          const config = await res.json();
+          document.title = `${config.company_name} - Assinaturas`;
+          document.documentElement.style.setProperty("--primary-color", config.theme_color_primary);
+          document.documentElement.style.setProperty("--secondary-color", config.theme_color_secondary);
+          
+          document.querySelectorAll(".header-logo").forEach(img => {
+            img.src = config.logo_path;
+          });
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // Carrega Tópicos Públicos
+    async function loadPublicTopics() {
+      const select = document.getElementById("sub-topic");
+      try {
+        const res = await fetch("/api/public/topics");
+        if (res.ok) {
+          const topics = await res.json();
+          select.innerHTML = '<option value="">-- Selecione o Assunto --</option>';
+          if (topics.length > 0) {
+            topics.forEach(t => {
+              const opt = document.createElement("option");
+              opt.value = t.id;
+              opt.innerText = t.topic_name;
+              select.appendChild(opt);
+            });
+          } else {
+            select.innerHTML = '<option value="">Nenhum canal público disponível no momento</option>';
+          }
+        }
+      } catch (err) {
+        select.innerHTML = '<option value="">Erro ao carregar canais</option>';
+      }
+    }
+
+    // Toggle Label
+    document.getElementById("sub-type").addEventListener("change", (e) => {
+      const label = document.getElementById("target-label");
+      const input = document.getElementById("sub-target");
+      if (e.target.value === "email") {
+        label.innerText = "Seu Endereço de E-mail";
+        input.placeholder = "Ex: seu-email@empresa.com";
+      } else {
+        label.innerText = "Seu Número de WhatsApp (com DDD)";
+        input.placeholder = "Ex: 5543912345678";
+      }
+    });
+
+    // Form Submit
+    document.getElementById("subscribe-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      
+      const payload = {
+        topic_id: parseInt(document.getElementById("sub-topic").value),
+        delivery_type: document.getElementById("sub-type").value,
+        target: document.getElementById("sub-target").value
+      };
+
+      try {
+        const res = await fetch("/api/public/subscribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          alert("Inscrição confirmada com sucesso! Você passará a receber os relatórios a partir da próxima publicação.");
+          document.getElementById("subscribe-form").reset();
+        } else {
+          const err = await res.json();
+          alert("Falha ao se inscrever: " + (err.detail || "Erro de validação."));
+        }
+      } catch (err) {
+        alert("Erro na conexão: " + err.message);
+      }
+    });
+
+    window.addEventListener("DOMContentLoaded", () => {
+      loadWhiteLabel();
+      loadPublicTopics();
+    });
+  </script>
+</body>
+</html>

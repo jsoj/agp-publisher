@@ -24,11 +24,17 @@ import requests
 import base64
 import markdown
 from xhtml2pdf import pisa
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
 
 # Importações locais
 from backend.database import (
     get_engine, init_db, get_session_factory, seed_db,
-    User, SystemConfig, ResearchTopic, TokenLog, PublicationHistory
+    User, SystemConfig, ResearchTopic, TokenLog, PublicationHistory,
+    AIModelConfig, EmailGroup, EmailContact, TopicSubscription
 )
 from backend.auth import (
     get_password_hash, verify_password, create_access_token, decode_access_token
@@ -37,7 +43,11 @@ from backend.schemas import (
     UserLogin, UserCreate, UserResponse, Token,
     TopicCreate, TopicUpdate, TopicResponse,
     SystemConfigUpdate, SystemConfigResponse,
-    TokenLogResponse, HistoryResponse
+    TokenLogResponse, HistoryResponse,
+    AIModelConfigCreate, AIModelConfigUpdate, AIModelConfigResponse,
+    EmailGroupCreate, EmailGroupUpdate, EmailGroupResponse,
+    EmailContactCreate, EmailContactUpdate, EmailContactResponse,
+    TopicSubscriptionCreate, TopicSubscriptionResponse
 )
 from backend.scheduler_service import calculate_next_random_run, TZ_SAO_PAULO
 
@@ -210,8 +220,154 @@ def get_bcb_financial_facts() -> str:
         return "\n".join(facts)
     return ""
 
+def generate_with_model_config(config: AIModelConfig, prompt: str, default_api_key: str, google_search: bool = False):
+    """
+    Executa a geração de conteúdo usando a configuração do modelo (AIModelConfig).
+    Suporta provedores 'gemini' nativamente e 'openai', 'anthropic', 'deepseek', etc., via chamada HTTP direta.
+    """
+    if not config or config.provider == 'gemini':
+        api_key = config.api_key if (config and config.api_key) else default_api_key
+        client = genai.Client(api_key=api_key)
+        model = config.model_name if config else "gemini-2.5-pro"
+        
+        cfg = None
+        if google_search:
+            cfg = types.GenerateContentConfig(
+                tools=[types.Tool(google_search=types.GoogleSearch())]
+            )
+            
+        response = client.models.generate_content(
+            model=model,
+            contents=prompt,
+            config=cfg
+        )
+        text = response.text
+        p_tokens = response.usage_metadata.prompt_token_count if response.usage_metadata else 0
+        c_tokens = response.usage_metadata.candidates_token_count if response.usage_metadata else 0
+        return text, p_tokens, c_tokens
+        
+    elif config.provider in ['openai', 'deepseek']:
+        api_key = config.api_key
+        model = config.model_name
+        
+        if config.provider == 'deepseek':
+            base_url = config.base_url or "https://api.deepseek.com"
+        else:
+            base_url = config.base_url or "https://api.openai.com/v1"
+            
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}]
+        }
+        
+        response = requests.post(f"{base_url.rstrip('/')}/chat/completions", headers=headers, json=payload, timeout=90)
+        response.raise_for_status()
+        res_data = response.json()
+        
+        text = res_data["choices"][0]["message"]["content"]
+        usage = res_data.get("usage", {})
+        p_tokens = usage.get("prompt_tokens", 0)
+        c_tokens = usage.get("completion_tokens", 0)
+        return text, p_tokens, c_tokens
+        
+    elif config.provider == 'anthropic':
+        api_key = config.api_key
+        model = config.model_name
+        base_url = config.base_url or "https://api.anthropic.com/v1"
+        
+        headers = {
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": model,
+            "max_tokens": 4096,
+            "messages": [{"role": "user", "content": prompt}]
+        }
+        
+        response = requests.post(f"{base_url.rstrip('/')}/messages", headers=headers, json=payload, timeout=90)
+        response.raise_for_status()
+        res_data = response.json()
+        
+        text = res_data["content"][0]["text"]
+        usage = res_data.get("usage", {})
+        p_tokens = usage.get("input_tokens", 0)
+        c_tokens = usage.get("output_tokens", 0)
+        return text, p_tokens, c_tokens
+        
+    else:
+        raise ValueError(f"Provedor de IA '{config.provider}' não suportado.")
+
+def send_email_report(subject: str, topic_name: str, pdf_path: str, email_addresses: List[str], db: Session):
+    """
+    Envia o relatório gerado por e-mail (anexo) para todos os contatos listados.
+    Puxa a configuração SMTP do banco de dados SystemConfig.
+    """
+    if not email_addresses:
+        return
+        
+    cfg_smtp_host = db.query(SystemConfig).filter_by(key="smtp_host").first()
+    cfg_smtp_port = db.query(SystemConfig).filter_by(key="smtp_port").first()
+    cfg_smtp_user = db.query(SystemConfig).filter_by(key="smtp_user").first()
+    cfg_smtp_pass = db.query(SystemConfig).filter_by(key="smtp_pass").first()
+    cfg_smtp_sender = db.query(SystemConfig).filter_by(key="smtp_sender").first()
+    
+    smtp_host = cfg_smtp_host.value if cfg_smtp_host else os.environ.get("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(cfg_smtp_port.value) if cfg_smtp_port else int(os.environ.get("SMTP_PORT", "587"))
+    smtp_user = cfg_smtp_user.value if cfg_smtp_user else os.environ.get("SMTP_USER", "")
+    smtp_pass = cfg_smtp_pass.value if cfg_smtp_pass else os.environ.get("SMTP_PASSWORD", "")
+    smtp_sender = cfg_smtp_sender.value if cfg_smtp_sender else (os.environ.get("SMTP_SENDER", "") or smtp_user)
+    
+    if not smtp_user or not smtp_pass:
+        print("⚠️ [SMTP] SMTP_USER ou SMTP_PASSWORD não configurados. Envio de e-mail cancelado.")
+        return
+        
+    print(f"📧 [SMTP] Enviando relatório por e-mail para {len(email_addresses)} destinatários...")
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = smtp_sender
+        msg['To'] = ", ".join(email_addresses)
+        msg['Subject'] = subject
+        
+        body = f"""
+        <html>
+        <body>
+            <p>Olá,</p>
+            <p>Segue em anexo o relatório executivo gerado automaticamente para o tópico: <b>{topic_name}</b>.</p>
+            <br>
+            <p>Atenciosamente,<br><b>Equipe AGP Publisher</b></p>
+        </body>
+        </html>
+        """
+        msg.attach(MIMEText(body, 'html'))
+        
+        with open(pdf_path, "rb") as attachment:
+            part = MIMEBase("application", "octet-stream")
+            part.set_payload(attachment.read())
+            encoders.encode_base64(part)
+            part.add_header(
+                "Content-Disposition",
+                f"attachment; filename= {os.path.basename(pdf_path)}",
+            )
+            msg.attach(part)
+            
+        server = smtplib.SMTP(smtp_host, smtp_port)
+        server.ehlo()
+        server.starttls()
+        server.login(smtp_user, smtp_pass)
+        server.sendmail(smtp_sender, email_addresses, msg.as_string())
+        server.quit()
+        print("✅ [SMTP] E-mails enviados com sucesso!")
+    except Exception as e:
+        print(f"❌ [SMTP] Erro ao enviar e-mail: {e}")
+
 def run_topic_pipeline(topic_id: int):
-    """Executa a coleta, síntese, auditoria, geração do PDF e publicação no WhatsApp para um tópico."""
+    """Executa a coleta, síntese, auditoria, geração do PDF e publicação no WhatsApp/E-mail para um tópico."""
     print(f"🚀 [Pipeline] Executando tópico ID {topic_id}...")
     db = SessionLocal()
     try:
@@ -222,42 +378,56 @@ def run_topic_pipeline(topic_id: int):
 
         user = topic.user
         
+        # Verifica se é biweekly e se deve pular esta semana (semana par)
+        if topic.schedule_interval == "biweekly":
+            week_num = datetime.date.today().isocalendar()[1]
+            if week_num % 2 == 0:
+                print(f"⏭️ [Pipeline] Pulando execução bi-semanal do tópico '{topic.topic_name}' (semana par).")
+                return
+        
         # 1. Recupera as credenciais de I.A. (BYOK ou Global)
         gemini_key = topic.custom_gemini_key
         if not gemini_key:
-            # Tenta pegar a global do .env
             gemini_key = os.environ.get("GEMINI_API_KEY")
             
         if not gemini_key:
             raise ValueError("Nenhuma Gemini API Key configurada para este tópico.")
 
-        # Inicializa cliente Gemini
-        client = genai.Client(api_key=gemini_key)
-        model = topic.preferred_model or "gemini-2.5-pro"
+        # Busca configurações de IA por etapa
+        collector_config = db.query(AIModelConfig).filter_by(id=topic.collector_model_id, is_active=True).first() if topic.collector_model_id else None
+        writer_config = db.query(AIModelConfig).filter_by(id=topic.writer_model_id, is_active=True).first() if topic.writer_model_id else None
+        auditor_config = db.query(AIModelConfig).filter_by(id=topic.auditor_model_id, is_active=True).first() if topic.auditor_model_id else None
         
-        # Variáveis de controle de tokens
+        # Nome do modelo padrão para log
+        active_model = "multi-model" if (collector_config or writer_config or auditor_config) else (topic.preferred_model or "gemini-2.5-pro")
+
         total_p_tokens = 0
         total_c_tokens = 0
 
         # MÓDULO 1: DailyCollector com filtro temporal
         print(f"🔍 [Pipeline] Coletando notícias para tópico '{topic.topic_name}'...")
-        time_constraint = get_time_period_constraint(topic.time_period)
+        if topic.date_range_start and topic.date_range_end:
+            time_constraint = f"no período de {topic.date_range_start} até {topic.date_range_end}"
+        else:
+            time_constraint = get_time_period_constraint(topic.time_period)
+            
         collector_prompt = f"""
         Hoje é dia {datetime.date.today().strftime('%d/%m/%Y')} (Ano de {datetime.date.today().year}).
         Busque na internet informações e notícias estritamente ocorridas {time_constraint} sobre: {topic.search_query}.
         Foque em relatórios e dados específicos desse período de tempo recente, descartando fatos de anos anteriores.
         Retorne os fatos principais detalhados e inclua as fontes/links obrigatórios de onde você retirou as informações.
         """
-        response_collector = client.models.generate_content(
-            model=model,
-            contents=collector_prompt,
-            config=types.GenerateContentConfig(
-                tools=[types.Tool(google_search=types.GoogleSearch())]
-            )
-        )
-        raw_data = response_collector.text
         
-        # Se for tópico de dólar/ptax/câmbio, busca dados oficiais do BCB e anexa aos dados brutos para grounding indestrutível
+        raw_data, p_tok, c_tok = generate_with_model_config(
+            config=collector_config,
+            prompt=collector_prompt,
+            default_api_key=gemini_key,
+            google_search=True
+        )
+        total_p_tokens += p_tok
+        total_c_tokens += c_tok
+        
+        # Se for tópico de dólar/ptax/câmbio, busca dados oficiais do BCB e anexa
         topic_lower = topic.topic_name.lower()
         query_lower = topic.search_query.lower()
         if any(w in topic_lower or w in query_lower for w in ["dólar", "dolar", "ptax", "câmbio", "cambio"]):
@@ -265,10 +435,6 @@ def run_topic_pipeline(topic_id: int):
             bcb_facts = get_bcb_financial_facts()
             if bcb_facts:
                 raw_data = f"{bcb_facts}\n\n{raw_data}"
-                
-        if response_collector.usage_metadata:
-            total_p_tokens += response_collector.usage_metadata.prompt_token_count
-            total_c_tokens += response_collector.usage_metadata.candidates_token_count
 
         # MÓDULO 2: Redator Sênior
         print(f"✍️ [Pipeline] Gerando rascunho de relatório...")
@@ -285,21 +451,21 @@ def run_topic_pipeline(topic_id: int):
         5. NÃO escreva "De:" nem "Para:" ou "Memorando". Vá direto para o "Assunto" e o conteúdo.
         6. O texto deve ser excelente, cobrindo as notícias com base nos dados fornecidos. Para cada notícia ou anúncio de mercado citado, inclua a data de publicação original no formato [dd/mm/aa] (exemplo: "[28/06/26]") logo no início do fato ou parágrafo correspondente.
         7. No final do documento, sob o cabeçalho "## Referências", liste todas as fontes de pesquisa de maneira organizada. Cada referência deve conter a data [dd/mm/aa], o nome da fonte/veículo e o link/URL original clicável em formato Markdown (exemplo: `* **[Nome do Veículo - dd/mm/aa]**: Breve resumo do fato - [Link da Notícia](URL)`). IMPORTANTE: Use APENAS URLs completas que foram fornecidas explicitamente nos resultados de pesquisa. NUNCA tente inventar, adivinhar ou deduzir caminhos de URL (como caminhos de página como `/currency/dxy`). Se o link completo e exato não estiver nos resultados de busca, use apenas a URL do domínio principal confirmado (exemplo: `https://tradingeconomics.com`) ou omita o link para evitar erros 404.
-        8. Para tabelas oficiais (como cotações PTAX e projeções Focus), você DEVE copiar e colar as tabelas em Markdown fornecidas nos DADOS BRUTOS exatamente como estão, preservando perfeitamente a sua estrutura de linhas, colunas, delimitadores e quebras de linha física (\n). Nunca altere seu formato ou tente colapsá-las.
+        8. Para tabelas oficiais (como cotações PTAX e projeções Focus), você DEVE copiar e colar as tabelas em Markdown fornecidas nos DADOS BRUTOS exatamente como estão, preservando perfeitamente a sua estrutura de linhas, colunas, delimitadores e quebras de linha física (\\n). Nunca altere seu formato ou tente colapsá-las.
         
         DADOS BRUTOS:
         {raw_data}
         """
-        response_draft = client.models.generate_content(
-            model=model,
-            contents=draft_prompt
+        
+        draft_text, p_tok, c_tok = generate_with_model_config(
+            config=writer_config,
+            prompt=draft_prompt,
+            default_api_key=gemini_key
         )
-        draft_text = response_draft.text
-        if response_draft.usage_metadata:
-            total_p_tokens += response_draft.usage_metadata.prompt_token_count
-            total_c_tokens += response_draft.usage_metadata.candidates_token_count
+        total_p_tokens += p_tok
+        total_c_tokens += c_tok
 
-        # MÓDULO 2 (Agente 2): Auditor
+        # MÓDULO 3 (Agente 2): Auditor
         print(f"🕵️‍♂️ [Pipeline] Auditando relatório...")
         audit_prompt = f"""
         Você é um Revisor e Auditor Sênior Rigoroso.
@@ -315,14 +481,14 @@ def run_topic_pipeline(topic_id: int):
         
         Retorne apenas o texto final em formato Markdown limpo, sem delimitações extras.
         """
-        response_audit = client.models.generate_content(
-            model=model,
-            contents=audit_prompt
+        
+        final_text, p_tok, c_tok = generate_with_model_config(
+            config=auditor_config,
+            prompt=audit_prompt,
+            default_api_key=gemini_key
         )
-        final_text = response_audit.text
-        if response_audit.usage_metadata:
-            total_p_tokens += response_audit.usage_metadata.prompt_token_count
-            total_c_tokens += response_audit.usage_metadata.candidates_token_count
+        total_p_tokens += p_tok
+        total_c_tokens += c_tok
 
         # MÓDULO 3: Geração de PDF (xhtml2pdf)
         print(f"📄 [Pipeline] Gerando PDF...")
@@ -358,7 +524,6 @@ def run_topic_pipeline(topic_id: int):
         # MÓDULO 4: Envio para o WhatsApp
         print(f"🚀 [Pipeline] Publicando no WhatsApp...")
         
-        # Recupera as configurações globais de Evolution API
         cfg_url = db.query(SystemConfig).filter_by(key="evolution_url").first()
         cfg_token = db.query(SystemConfig).filter_by(key="evolution_token").first()
         
@@ -376,14 +541,16 @@ def run_topic_pipeline(topic_id: int):
         with open(pdf_filename, "rb") as pdf_file:
             b64_content = base64.b64encode(pdf_file.read()).decode('utf-8')
             
-        # Divide e sanitiza os destinos do WhatsApp
+        # Coleta destinatários do WhatsApp (Topic targets + Public subscriptions)
         targets = sanitize_whatsapp_targets(topic.whatsapp_target)
-        if not targets:
-            raise ValueError("Nenhum destinatário do WhatsApp válido configurado.")
+        wa_subs = db.query(TopicSubscription).filter_by(topic_id=topic_id, delivery_type="whatsapp", is_active=True).all()
+        for sub in wa_subs:
+            targets.extend(sanitize_whatsapp_targets(sub.target))
+        targets = list(set(targets))
 
         # Dispara para cada destinatário
         for target in targets:
-            print(f"[Pipeline] Enviando PDF para destinatário: {target}")
+            print(f"[Pipeline] Enviando PDF para destinatário WhatsApp: {target}")
             payload = {
                 "number": target,
                 "mediatype": "document",
@@ -392,9 +559,29 @@ def run_topic_pipeline(topic_id: int):
                 "fileName": os.path.basename(pdf_filename),
                 "caption": f"📊 *Relatório: {topic.topic_name}*"
             }
-            # Faz o request HTTP com timeout expandido para 90s
             response_wa = requests.post(evolution_url, headers=headers, json=payload, timeout=90)
             response_wa.raise_for_status()
+
+        # MÓDULO 5: Envio de E-mails (EmailGroups + Public subscriptions)
+        email_addresses = []
+        for group in topic.email_groups:
+            for contact in group.contacts:
+                email_addresses.append(contact.email)
+                
+        email_subs = db.query(TopicSubscription).filter_by(topic_id=topic_id, delivery_type="email", is_active=True).all()
+        for sub in email_subs:
+            email_addresses.append(sub.target)
+            
+        email_addresses = list(set(email_addresses))
+        
+        if email_addresses:
+            send_email_report(
+                subject=f"📊 Relatório Executivo: {topic.topic_name}",
+                topic_name=topic.topic_name,
+                pdf_path=pdf_filename,
+                email_addresses=email_addresses,
+                db=db
+            )
 
         # Salva o Log de Tokens e Histórico de Envio com o Markdown Gerado
         token_log = TokenLog(
@@ -403,7 +590,7 @@ def run_topic_pipeline(topic_id: int):
             prompt_tokens=total_p_tokens,
             completion_tokens=total_c_tokens,
             total_tokens=total_p_tokens + total_c_tokens,
-            model_used=model
+            model_used=active_model
         )
         db.add(token_log)
         
@@ -447,11 +634,23 @@ def schedule_topic_job(topic: ResearchTopic):
         return
         
     if topic.schedule_type == "fixed":
-        # Formato esperado: fixed_time="08:00"
         if not topic.fixed_time:
             return
         h, m = map(int, topic.fixed_time.split(':'))
-        trigger = CronTrigger(hour=h, minute=m, timezone=TZ_SAO_PAULO)
+        
+        trigger_args = {"hour": h, "minute": m, "timezone": TZ_SAO_PAULO}
+        
+        if topic.schedule_interval in ["weekly", "biweekly"]:
+            if topic.schedule_days:
+                # Transforma dias da semana se forem numéricos (ex: 0,2,4 para seg, qua, sex)
+                trigger_args["day_of_week"] = topic.schedule_days
+        elif topic.schedule_interval == "monthly":
+            day = 1
+            if topic.schedule_days and topic.schedule_days.isdigit():
+                day = int(topic.schedule_days)
+            trigger_args["day"] = day
+            
+        trigger = CronTrigger(**trigger_args)
         scheduler.add_job(
             run_topic_pipeline,
             trigger=trigger,
@@ -460,7 +659,6 @@ def schedule_topic_job(topic: ResearchTopic):
             replace_existing=True
         )
     elif topic.schedule_type == "random":
-        # Para agendamento aleatório, sorteia o primeiro disparo
         reschedule_random_job(topic.id)
 
 def reschedule_random_job(topic_id: int):
@@ -566,12 +764,26 @@ def create_topic(topic_data: TopicCreate, current_user: User = Depends(get_curre
         random_range_start=topic_data.random_range_start,
         random_range_end=topic_data.random_range_end,
         days_of_week=topic_data.days_of_week,
+        schedule_interval=topic_data.schedule_interval,
+        schedule_days=topic_data.schedule_days,
+        date_range_start=topic_data.date_range_start,
+        date_range_end=topic_data.date_range_end,
+        collector_model_id=topic_data.collector_model_id,
+        writer_model_id=topic_data.writer_model_id,
+        auditor_model_id=topic_data.auditor_model_id,
         custom_gemini_key=topic_data.custom_gemini_key,
         preferred_model=topic_data.preferred_model,
-        time_period=topic_data.time_period
+        time_period=topic_data.time_period,
+        is_public=topic_data.is_public
     )
     db.add(new_topic)
     db.commit()
+    
+    if topic_data.email_group_ids:
+        groups = db.query(EmailGroup).filter(EmailGroup.id.in_(topic_data.email_group_ids)).all()
+        new_topic.email_groups = groups
+        db.commit()
+        
     db.refresh(new_topic)
     
     # Agenda no APScheduler
@@ -594,8 +806,15 @@ def update_topic(topic_id: int, topic_data: TopicUpdate, current_user: User = De
     if current_user.role != "admin" and topic.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Acesso negado.")
         
-    for field, val in topic_data.dict(exclude_unset=True).items():
+    update_data = topic_data.dict(exclude_unset=True)
+    email_group_ids = update_data.pop("email_group_ids", None)
+    
+    for field, val in update_data.items():
         setattr(topic, field, val)
+        
+    if email_group_ids is not None:
+        groups = db.query(EmailGroup).filter(EmailGroup.id.in_(email_group_ids)).all()
+        topic.email_groups = groups
         
     db.commit()
     db.refresh(topic)
@@ -681,7 +900,12 @@ def get_system_config(current_user: User = Depends(get_current_user), db: Sessio
         "theme_color_secondary": cfg_dict.get("theme_color_secondary", "#2563EB"),
         "logo_path": cfg_dict.get("logo_path", "/static/logo.png"),
         "evolution_url": cfg_dict.get("evolution_url") if current_user.role == "admin" else None,
-        "evolution_token": cfg_dict.get("evolution_token") if current_user.role == "admin" else None
+        "evolution_token": cfg_dict.get("evolution_token") if current_user.role == "admin" else None,
+        "smtp_host": cfg_dict.get("smtp_host") if current_user.role == "admin" else None,
+        "smtp_port": cfg_dict.get("smtp_port") if current_user.role == "admin" else None,
+        "smtp_user": cfg_dict.get("smtp_user") if current_user.role == "admin" else None,
+        "smtp_pass": cfg_dict.get("smtp_pass") if current_user.role == "admin" else None,
+        "smtp_sender": cfg_dict.get("smtp_sender") if current_user.role == "admin" else None
     }
 
 @app.put("/api/admin/config")
@@ -747,6 +971,179 @@ def delete_user(user_id: int, current_admin: User = Depends(get_current_admin), 
     db.delete(user)
     db.commit()
     return {"detail": "Usuário deletado com sucesso."}
+
+# ==========================================
+# ROTAS: CONFIGURAÇÕES DE MODELOS DE IA (ADMIN)
+# ==========================================
+
+@app.get("/api/admin/model-configs", response_model=List[AIModelConfigResponse])
+def get_model_configs(current_admin: User = Depends(get_current_admin), db: Session = Depends(get_db)):
+    return db.query(AIModelConfig).all()
+
+@app.post("/api/admin/model-configs", response_model=AIModelConfigResponse)
+def create_model_config(config_data: AIModelConfigCreate, current_admin: User = Depends(get_current_admin), db: Session = Depends(get_db)):
+    config = AIModelConfig(
+        provider=config_data.provider,
+        model_name=config_data.model_name,
+        api_key=config_data.api_key,
+        base_url=config_data.base_url,
+        is_active=True
+    )
+    db.add(config)
+    db.commit()
+    db.refresh(config)
+    return config
+
+@app.put("/api/admin/model-configs/{config_id}", response_model=AIModelConfigResponse)
+def update_model_config(config_id: int, config_data: AIModelConfigUpdate, current_admin: User = Depends(get_current_admin), db: Session = Depends(get_db)):
+    config = db.query(AIModelConfig).filter_by(id=config_id).first()
+    if not config:
+        raise HTTPException(status_code=404, detail="Configuração de modelo não encontrada.")
+    
+    if config_data.provider is not None:
+        config.provider = config_data.provider
+    if config_data.model_name is not None:
+        config.model_name = config_data.model_name
+    if config_data.api_key is not None:
+        config.api_key = config_data.api_key
+    if config_data.base_url is not None:
+        config.base_url = config_data.base_url
+    if config_data.is_active is not None:
+        config.is_active = config_data.is_active
+        
+    db.commit()
+    db.refresh(config)
+    return config
+
+@app.delete("/api/admin/model-configs/{config_id}")
+def delete_model_config(config_id: int, current_admin: User = Depends(get_current_admin), db: Session = Depends(get_db)):
+    config = db.query(AIModelConfig).filter_by(id=config_id).first()
+    if not config:
+        raise HTTPException(status_code=404, detail="Configuração de modelo não encontrada.")
+    db.delete(config)
+    db.commit()
+    return {"detail": "Configuração de modelo deletada com sucesso."}
+
+# ==========================================
+# ROTAS: GRUPOS E CONTATOS DE E-MAIL (USUÁRIO)
+# ==========================================
+
+@app.get("/api/email-groups", response_model=List[EmailGroupResponse])
+def get_email_groups(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return db.query(EmailGroup).filter_by(user_id=current_user.id).all()
+
+@app.post("/api/email-groups", response_model=EmailGroupResponse)
+def create_email_group(group_data: EmailGroupCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    group = EmailGroup(
+        user_id=current_user.id,
+        name=group_data.name,
+        description=group_data.description
+    )
+    db.add(group)
+    db.commit()
+    db.refresh(group)
+    
+    # Adiciona os contatos enviados
+    for c in group_data.contacts:
+        contact = EmailContact(
+            group_id=group.id,
+            name=c.name,
+            email=c.email
+        )
+        db.add(contact)
+    db.commit()
+    db.refresh(group)
+    return group
+
+@app.put("/api/email-groups/{group_id}", response_model=EmailGroupResponse)
+def update_email_group(group_id: int, group_data: EmailGroupUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    group = db.query(EmailGroup).filter_by(id=group_id, user_id=current_user.id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="Grupo de e-mail não encontrado.")
+    if group_data.name is not None:
+        group.name = group_data.name
+    if group_data.description is not None:
+        group.description = group_data.description
+    db.commit()
+    db.refresh(group)
+    return group
+
+@app.delete("/api/email-groups/{group_id}")
+def delete_email_group(group_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    group = db.query(EmailGroup).filter_by(id=group_id, user_id=current_user.id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="Grupo de e-mail não encontrado.")
+    db.delete(group)
+    db.commit()
+    return {"detail": "Grupo de e-mail deletado com sucesso."}
+
+@app.post("/api/email-groups/{group_id}/contacts", response_model=EmailContactResponse)
+def add_email_contact(group_id: int, contact_data: EmailContactCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    group = db.query(EmailGroup).filter_by(id=group_id, user_id=current_user.id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="Grupo de e-mail não encontrado.")
+    contact = EmailContact(
+        group_id=group.id,
+        name=contact_data.name,
+        email=contact_data.email
+    )
+    db.add(contact)
+    db.commit()
+    db.refresh(contact)
+    return contact
+
+@app.delete("/api/email-contacts/{contact_id}")
+def delete_email_contact(contact_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    contact = db.query(EmailContact).join(EmailGroup).filter(
+        EmailContact.id == contact_id,
+        EmailGroup.user_id == current_user.id
+    ).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contato não encontrado.")
+    db.delete(contact)
+    db.commit()
+    return {"detail": "Contato deletado com sucesso."}
+
+# ==========================================
+# ROTAS PÚBLICAS: AUTO-INSCRIÇÃO
+# ==========================================
+
+@app.get("/api/public/topics")
+def get_public_topics(db: Session = Depends(get_db)):
+    topics = db.query(ResearchTopic).filter_by(is_active=1, is_public=1).all()
+    return [
+        {
+            "id": t.id,
+            "topic_name": t.topic_name,
+            "search_query": t.search_query
+        }
+        for t in topics
+    ]
+
+@app.post("/api/public/subscribe", response_model=TopicSubscriptionResponse)
+def public_subscribe_to_topic(sub_data: TopicSubscriptionCreate, db: Session = Depends(get_db)):
+    topic = db.query(ResearchTopic).filter_by(id=sub_data.topic_id, is_active=1, is_public=1).first()
+    if not topic:
+        raise HTTPException(status_code=404, detail="Tópico público não encontrado.")
+    
+    existing = db.query(TopicSubscription).filter_by(
+        topic_id=sub_data.topic_id,
+        delivery_type=sub_data.delivery_type,
+        target=sub_data.target
+    ).first()
+    if existing:
+        return existing
+        
+    sub = TopicSubscription(
+        topic_id=sub_data.topic_id,
+        delivery_type=sub_data.delivery_type,
+        target=sub_data.target,
+        is_active=True
+    )
+    db.add(sub)
+    db.commit()
+    db.refresh(sub)
+    return sub
 
 # ==========================================
 # INTEGRAÇÃO EVOLUTION QR CODE & WHATSAPP INSTANCE

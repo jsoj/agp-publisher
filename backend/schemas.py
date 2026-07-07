@@ -39,6 +39,93 @@ class Token(BaseModel):
     user: UserResponse
 
 # ==========================================
+# AI MODEL CONFIG SCHEMAS
+# ==========================================
+
+class AIModelConfigCreate(BaseModel):
+    provider: str # 'gemini', 'openai', 'anthropic', 'deepseek', etc.
+    model_name: str
+    api_key: str
+    base_url: Optional[str] = None
+
+class AIModelConfigUpdate(BaseModel):
+    provider: Optional[str] = None
+    model_name: Optional[str] = None
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
+    is_active: Optional[bool] = None
+
+class AIModelConfigResponse(BaseModel):
+    id: int
+    provider: str
+    model_name: str
+    base_url: Optional[str] = None
+    is_active: bool
+
+    class Config:
+        from_attributes = True
+
+# ==========================================
+# EMAIL GROUP & CONTACT SCHEMAS
+# ==========================================
+
+class EmailContactCreate(BaseModel):
+    name: str
+    email: str
+
+class EmailContactUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+
+class EmailContactResponse(BaseModel):
+    id: int
+    group_id: int
+    name: str
+    email: str
+
+    class Config:
+        from_attributes = True
+
+class EmailGroupCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    contacts: Optional[List[EmailContactCreate]] = []
+
+class EmailGroupUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+class EmailGroupResponse(BaseModel):
+    id: int
+    user_id: int
+    name: str
+    description: Optional[str] = None
+    contacts: List[EmailContactResponse] = []
+
+    class Config:
+        from_attributes = True
+
+# ==========================================
+# TOPIC SUBSCRIPTION SCHEMAS
+# ==========================================
+
+class TopicSubscriptionCreate(BaseModel):
+    topic_id: int
+    delivery_type: str # 'whatsapp' ou 'email'
+    target: str
+
+class TopicSubscriptionResponse(BaseModel):
+    id: int
+    topic_id: int
+    delivery_type: str
+    target: str
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# ==========================================
 # TOPIC SCHEMAS
 # ==========================================
 
@@ -51,9 +138,18 @@ class TopicCreate(BaseModel):
     random_range_start: Optional[str] = None # "HH:MM"
     random_range_end: Optional[str] = None # "HH:MM"
     days_of_week: Optional[str] = None # "1,2,3,4,5"
+    schedule_interval: Optional[str] = "daily" # 'daily', 'weekly', 'biweekly', 'monthly'
+    schedule_days: Optional[str] = None # "1,3,5" para Seg, Qua, Sex
+    date_range_start: Optional[str] = None # YYYY-MM-DD
+    date_range_end: Optional[str] = None # YYYY-MM-DD
+    collector_model_id: Optional[int] = None
+    writer_model_id: Optional[int] = None
+    auditor_model_id: Optional[int] = None
     custom_gemini_key: Optional[str] = None
     preferred_model: Optional[str] = "gemini-2.5-pro"
     time_period: Optional[str] = "month"
+    is_public: Optional[int] = 0
+    email_group_ids: Optional[List[int]] = []
 
 class TopicUpdate(BaseModel):
     topic_name: Optional[str] = None
@@ -64,10 +160,19 @@ class TopicUpdate(BaseModel):
     random_range_start: Optional[str] = None
     random_range_end: Optional[str] = None
     days_of_week: Optional[str] = None
+    schedule_interval: Optional[str] = None
+    schedule_days: Optional[str] = None
+    date_range_start: Optional[str] = None
+    date_range_end: Optional[str] = None
+    collector_model_id: Optional[int] = None
+    writer_model_id: Optional[int] = None
+    auditor_model_id: Optional[int] = None
     custom_gemini_key: Optional[str] = None
     preferred_model: Optional[str] = None
     is_active: Optional[int] = None
+    is_public: Optional[int] = None
     time_period: Optional[str] = None
+    email_group_ids: Optional[List[int]] = []
 
 class TopicResponse(BaseModel):
     id: int
@@ -80,11 +185,20 @@ class TopicResponse(BaseModel):
     random_range_start: Optional[str] = None
     random_range_end: Optional[str] = None
     days_of_week: Optional[str] = None
+    schedule_interval: str
+    schedule_days: Optional[str] = None
+    date_range_start: Optional[str] = None
+    date_range_end: Optional[str] = None
+    collector_model_id: Optional[int] = None
+    writer_model_id: Optional[int] = None
+    auditor_model_id: Optional[int] = None
     custom_gemini_key: Optional[str] = None
     preferred_model: str
     is_active: int
+    is_public: int
     time_period: str
     created_at: datetime
+    email_groups: List[EmailGroupResponse] = []
 
     class Config:
         from_attributes = True
@@ -99,6 +213,11 @@ class SystemConfigUpdate(BaseModel):
     company_name: Optional[str] = None
     theme_color_primary: Optional[str] = None
     theme_color_secondary: Optional[str] = None
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[str] = None
+    smtp_user: Optional[str] = None
+    smtp_pass: Optional[str] = None
+    smtp_sender: Optional[str] = None
 
 class SystemConfigResponse(BaseModel):
     company_name: str
@@ -107,6 +226,11 @@ class SystemConfigResponse(BaseModel):
     logo_path: str
     evolution_url: Optional[str] = None
     evolution_token: Optional[str] = None
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[str] = None
+    smtp_user: Optional[str] = None
+    smtp_pass: Optional[str] = None
+    smtp_sender: Optional[str] = None
 
 # ==========================================
 # TOKEN & HISTORY SCHEMAS
