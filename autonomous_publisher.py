@@ -65,22 +65,41 @@ class DailyCollector:
     def __init__(self):
         pass
 
-    def fetch_daily_news(self, query):
-        """Coleta informações recentes utilizando a capacidade de busca do Gemini."""
-        print(f"🔍 Buscando informações sobre: {query}...")
+    def fetch_daily_news(self, query, time_window_hours=48):
+        """Coleta informações recentes utilizando a capacidade de busca do Gemini com Google Search Grounding habilitado no período especificado (default 48h)."""
+        today = datetime.date.today()
+        start_date = today - datetime.timedelta(hours=time_window_hours)
+        today_str = today.strftime('%d/%m/%Y')
+        start_str = start_date.strftime('%d/%m/%Y')
+
+        print(f"🔍 Buscando informações recentes ({time_window_hours}h - período de {start_str} a {today_str}) sobre: {query}...")
         
         prompt = f"""
-        Busque as informações e notícias mais recentes de hoje sobre: {query}.
-        Foque estritamente em: lançamentos de novos modelos de IA, novas aplicações, movimentações de mercado das empresas de Inteligência Artificial e novidades do ecossistema Open Source de IA.
-        Retorne os fatos principais detalhados e inclua as fontes/links obrigatórios de onde você retirou as informações.
+        DATA ATUAL DA PESQUISA: {today_str} (Ano de {today.year}).
+        SUA TAREFA: Buscar e trazer EXCLUSIVAMENTE informações, novidades e notícias RECENTES sobre: {query}, publicadas ou ocorridas estritamente nas ÚLTIMAS {time_window_hours} HORAS (entre {start_str} e {today_str}).
+
+        REGRAS CRÍTICAS DE PESQUISA E FILTRAGEM:
+        1. REJEITE e IGNORE qualquer notícia, artigo ou evento de anos ou meses anteriores (ex: 2023, 2024, 2025). Não traga fatos desatualizados.
+        2. Foque estritamente em:
+           - Lançamentos de novos modelos de IA (ex: LLMs Open Source no Hugging Face, novidades da OpenAI, Anthropic, Google, DeepSeek, Meta, Mistral, Qwen).
+           - Novas aplicações práticas e ferramentas de IA.
+           - Movimentações recentes de mercado das empresas de Inteligência Artificial.
+           - Novidades do ecossistema Open Source de IA.
+        3. Para cada fato/notícia retornado, informe a data/hora aproximada da publicação (dentro das últimas 48h) e inclua obrigatoriamente as fontes/links originais de onde você extraiu as informações.
         """
         
-        # Chamada direta sem tools de busca para manter as referências e links consistentes
+        # Habilita o Google Search Grounding para obter informações recentes e links em tempo real
+        config = types.GenerateContentConfig(
+            tools=[types.Tool(google_search=types.GoogleSearch())]
+        )
+
         response = client.models.generate_content(
             model='gemini-2.5-pro',
-            contents=prompt
+            contents=prompt,
+            config=config
         )
         return response.text
+
 
 # ==========================================
 # MÓDULO 2: SUMARIZAÇÃO MULTI-AGENTE

@@ -153,6 +153,9 @@ def get_time_period_constraint(period: str) -> str:
     if period == "24h":
         start_date = today - datetime.timedelta(days=1)
         return f"nas últimas 24 horas (desde {start_date.strftime('%Y-%m-%d')})"
+    elif period == "48h":
+        start_date = today - datetime.timedelta(days=2)
+        return f"nas últimas 48 horas (desde {start_date.strftime('%Y-%m-%d')})"
     elif period == "week":
         start_date = today - datetime.timedelta(days=7)
         return f"nos últimos 7 dias (desde {start_date.strftime('%Y-%m-%d')})"
@@ -162,6 +165,7 @@ def get_time_period_constraint(period: str) -> str:
     elif period == "year":
         return f"no ano de {today.year} (desde {today.year}-01-01)"
     return f"nos últimos 30 dias (desde {(today - datetime.timedelta(days=30)).strftime('%Y-%m-%d')})"
+
 
 def get_bcb_financial_facts() -> str:
     """Busca cotações PTAX recentes e as expectativas do Focus de Câmbio da API do Banco Central."""

@@ -311,6 +311,10 @@ def test_time_period_filtering():
     c_24h = get_time_period_constraint("24h")
     assert "24 horas" in c_24h
     
+    # 48h
+    c_48h = get_time_period_constraint("48h")
+    assert "48 horas" in c_48h
+
     # week
     c_week = get_time_period_constraint("week")
     assert "últimos 7 dias" in c_week
@@ -322,6 +326,7 @@ def test_time_period_filtering():
     # year
     c_year = get_time_period_constraint("year")
     assert f"ano de {datetime.date.today().year}" in c_year
+
 
 def test_bcb_grounding():
     """Garante que a função de grounding do BCB traga cotações reais e estruturadas."""
