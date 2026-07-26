@@ -391,6 +391,10 @@ def run_topic_pipeline(topic_id: int):
         
         # 1. Recupera as credenciais de I.A. (BYOK ou Global)
         gemini_key = topic.custom_gemini_key
+        if gemini_key and not gemini_key.startswith("AIzaSy"):
+            print(f"⚠️ Chave Gemini customizada inválida detectada no tópico '{topic.topic_name}'. Usando chave global do sistema.")
+            gemini_key = None
+
         if not gemini_key:
             gemini_key = os.environ.get("GEMINI_API_KEY")
             
