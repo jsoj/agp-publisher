@@ -729,6 +729,7 @@ def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
     return new_user
 
 @app.post("/api/auth/login", response_model=Token)
+@app.post("/api/auth/token", response_model=Token)
 def login_user(login_data: UserLogin, db: Session = Depends(get_db)):
     user = db.query(User).filter_by(username=login_data.username).first()
     if not user or not verify_password(login_data.password, user.password_hash):
