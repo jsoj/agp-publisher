@@ -1228,6 +1228,9 @@ def get_whatsapp_connect_qrcode(current_user: User = Depends(get_current_user), 
             "warning": f"Evolution API offline. Usando mock. Detalhes: {e}"
         }
 
+# Servidor de arquivos estáticos da interface web (frontend)
+app.mount("/", StaticFiles(directory="static", html=True), name="frontend")
+
 if __name__ == "__main__":
     import uvicorn
     # Executa o servidor na porta 8080 para evitar conflitos com outros servidores locais (ex: Django)
