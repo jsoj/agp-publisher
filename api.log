@@ -1,0 +1,6 @@
+INFO:     Started server process [3532551]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8060 (Press CTRL+C to quit)
+💾 [Database] Banco de dados SQLite Multi-Tenant inicializado com modo WAL!
+INFO:     127.0.0.1:40116 - "GET /health HTTP/1.1" 200 OK
