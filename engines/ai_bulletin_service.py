@@ -99,10 +99,17 @@ async def publish_informe_ia(
 
     results = {}
 
-    # 1. Envio do Texto Longo / Detalhado
+    # 1. Envio do Texto Longo / Detalhado (com linkPreview desativado para evitar banner gráfico)
     async with httpx.AsyncClient(timeout=30.0) as client:
         text_url = f"{EVOLUTION_URL}/message/sendText/{EVOLUTION_INSTANCE}"
-        payload = {"number": AI_GROUP_JID, "text": full_text_message}
+        payload = {
+            "number": AI_GROUP_JID, 
+            "text": full_text_message,
+            "linkPreview": False,
+            "options": {
+                "linkPreview": False
+            }
+        }
         resp_text = await client.post(text_url, json=payload, headers=headers)
         results["text_status"] = resp_text.status_code in [200, 201]
 
