@@ -3,20 +3,23 @@ import sys
 import os
 
 sys.path.append("/root/agp-publisher")
+from engines.market_data_engine import fetch_deterministic_usdbRL
 from engines.dolar_produtiva_service import publish_informe_dolar_produtiva
 
 async def run():
-    # Executa a apuração e fechamento do pregão oficial
-    cotacao = "R$ 5,2190"
-    variacao = "+0,38%"
-    min_val = "R$ 5,1980"
-    max_val = "R$ 5,2260"
+    market = await fetch_deterministic_usdbRL()
+    cotacao = market["cotacao"]
+    variacao = market["variacao"]
+    min_val = market["min_val"]
+    max_val = market["max_val"]
+    is_alert = abs(market["pct_raw"]) >= 1.5
+
     resumo = (
-        "O dólar comercial encerrou o pregão desta segunda-feira em leve valorização, "
-        "fechando o mês de agosto com investidores atentos aos rendimentos dos Treasuries e dados fiscais domésticos."
+        f"O dólar comercial encerrou o pregão desta segunda-feira, 31 de agosto de 2026, cotado a {cotacao} ({variacao}). "
+        f"A moeda registrou mínima de {min_val} e máxima de {max_val}, encerrando o mês de agosto com ajustes de carteira e liquidez moderada."
     )
-    fontes = ["Broadcast", "B3", "InfoMoney", "Valor Econômico"]
-    cbot_info = "Soja fecha em alta moderada na Bolsa de Chicago (CBOT)."
+    fontes = ["B3", "Broadcast", "Yahoo Finance API"]
+    cbot_info = "Soja na Bolsa de Chicago (CBOT) fechou com oscilações pontuais nos vencimentos futuros."
 
     res = await publish_informe_dolar_produtiva(
         cotacao=cotacao,
@@ -26,7 +29,7 @@ async def run():
         resumo_mercado=resumo,
         fontes=fontes,
         cbot_info=cbot_info,
-        is_alert=False
+        is_alert=is_alert
     )
     print("DOLAR_FECHAMENTO_DISPATCH:", res)
 

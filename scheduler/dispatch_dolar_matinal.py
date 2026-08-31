@@ -3,20 +3,23 @@ import sys
 import os
 
 sys.path.append("/root/agp-publisher")
+from engines.market_data_engine import fetch_deterministic_usdbRL
 from engines.dolar_produtiva_service import publish_informe_dolar_produtiva
 
 async def run():
-    # Cotação e dados matinais do mercado
-    cotacao = "R$ 5,2180"
-    variacao = "+0,35%"
-    min_val = "R$ 5,2010"
-    max_val = "R$ 5,2240"
+    market = await fetch_deterministic_usdbRL()
+    cotacao = market["cotacao"]
+    variacao = market["variacao"]
+    min_val = market["min_val"]
+    max_val = market["max_val"]
+    is_alert = abs(market["pct_raw"]) >= 1.5
+
     resumo = (
-        "O dólar comercial opera em leve alta na manhã desta segunda-feira, 31 de agosto de 2026, "
-        "com o mercado reagindo aos desdobramentos de política monetária nos EUA e fluxo cambial de encerramento do mês."
+        f"Na manhã desta segunda-feira, 31 de agosto de 2026, o dólar opera cotado a {cotacao} ({variacao}). "
+        "O mercado de câmbio acompanha a dinâmica das taxas de juros globais e o fluxo de ajuste de posições no encerramento do mês."
     )
-    fontes = ["Broadcast", "UOL Economia", "InfoMoney"]
-    cbot_info = "Soja em Chicago opera em estabilidade com leve viés positivo na abertura dos negócios."
+    fontes = ["Broadcast", "B3", "Yahoo Finance API"]
+    cbot_info = "Soja na Bolsa de Chicago (CBOT) opera com estabilidade na sessão diurna."
 
     res = await publish_informe_dolar_produtiva(
         cotacao=cotacao,
@@ -26,7 +29,7 @@ async def run():
         resumo_mercado=resumo,
         fontes=fontes,
         cbot_info=cbot_info,
-        is_alert=False
+        is_alert=is_alert
     )
     print("DOLAR_MATINAL_DISPATCH:", res)
 
