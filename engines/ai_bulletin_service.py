@@ -54,7 +54,7 @@ async def get_recent_ai_topics() -> list[str]:
             """)
             async with db.execute("""
                 SELECT topic_title FROM ai_bulletin_history 
-                WHERE created_at >= datetime('now', '-2 days')
+                WHERE created_at >= datetime('now', '-1 day')
             """) as cursor:
                 rows = await cursor.fetchall()
                 return [r[0] for r in rows]
