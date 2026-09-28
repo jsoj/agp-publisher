@@ -4,10 +4,10 @@ import os
 
 sys.path.append("/root/agp-publisher")
 from engines.ai_bulletin_service import publish_informe_ia, get_recent_ai_topics
-from engines.ai_curator_engine import generate_daily_ai_bulletin
+from engines.ai_curator_engine import generate_daily_ai_bulletin_async
 
 async def main():
-    print("🚀 [AI Bulletin Runner] Iniciando curadoria autônoma ao vivo com busca web e deduplicação...")
+    print("🚀 [AI Bulletin Runner] Iniciando curadoria autônoma com citações determinísticas e validação anti-404...")
     
     # 1. Recupera histórico das últimas 24 horas gravado no SQLite
     recent_topics = await get_recent_ai_topics()
@@ -15,10 +15,8 @@ async def main():
     for t in recent_topics:
         print(f"   - {t}")
 
-    # 2. Executa a curadoria inteligente com pesquisa ao vivo no Google Search e Gemini API
-    # Salvaguarda: loop de execução síncrona/assíncrona protegida
-    loop = asyncio.get_running_loop()
-    curated = await loop.run_in_executor(None, generate_daily_ai_bulletin, recent_topics)
+    # 2. Executa a curadoria inteligente com busca ao vivo e validação nativa de links
+    curated = await generate_daily_ai_bulletin_async(recent_topics)
     
     date_str = curated["date_str"]
     edition_num = curated["edition_num"]
