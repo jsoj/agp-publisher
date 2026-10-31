@@ -76,7 +76,7 @@ async def init_db():
         # Popula dados iniciais dos tenants e boletins se vazios
         await db.execute("""
         INSERT OR IGNORE INTO tenants (id, name, domain) 
-        VALUES ('brasil2050', 'Projeto Brasil 2050', 'projetobrasil2050.site');
+        VALUES ('brasil2050', 'Projeto Brasil 2050', 'quantisia.com.br');
         """)
 
         await db.execute("""

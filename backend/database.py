@@ -220,7 +220,7 @@ def seed_db(session, default_admin_password_hash):
     """Popula as tabelas com valores iniciais se estiverem vazias."""
     # Seed de Configurações do Sistema
     defaults = {
-        "evolution_url": os.environ.get("WHATSAPP_API_URL", "https://evolution.projetobrasil2050.site/message/sendMedia/01"),
+        "evolution_url": os.environ.get("WHATSAPP_API_URL", "https://evolution.quantisia.com.br/message/sendMedia/01"),
         "evolution_token": os.environ.get("WHATSAPP_API_TOKEN", "6CBB7DCE6D50-4851-A607-F2EC2C1580C2"),
         "company_name": "AGP Publisher",
         "theme_color_primary": "#1E3A8A",

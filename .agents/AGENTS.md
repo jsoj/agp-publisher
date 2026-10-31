@@ -61,7 +61,7 @@ Whenever modifying text generation prompts or output validators, the following c
 Ensure the following keys are populated in your local `.env` file (never commit actual `.env` keys to Git):
 ```env
 GEMINI_API_KEY="AIzaSy..."
-WHATSAPP_API_URL="https://evolution.projetobrasil2050.site/message/sendMedia/01"
+WHATSAPP_API_URL="https://evolution.quantisia.com.br/message/sendMedia/01"
 WHATSAPP_API_TOKEN="6CBB7DCE6D50-..."
 WHATSAPP_GROUP_ID="120363410789564152@g.us"
 LINK_GROUP="https://chat.whatsapp.com/DJDWRobITde5Mc7SZ4De1R"

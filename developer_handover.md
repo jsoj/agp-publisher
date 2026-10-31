@@ -51,7 +51,7 @@ graph TD
 Ao iniciar o desenvolvimento no notebook, certifique-se de configurar o arquivo `.env` com esta estrutura:
 ```env
 GEMINI_API_KEY="SUA_CHAVE_API_GEMINI"
-WHATSAPP_API_URL="https://evolution.projetobrasil2050.site/message/sendMedia/01"
+WHATSAPP_API_URL="https://evolution.quantisia.com.br/message/sendMedia/01"
 WHATSAPP_API_TOKEN="6CBB7DCE6D50-4851-A607-F2EC2C1580C2"
 WHATSAPP_GROUP_ID="120363410789564152@g.us"
 LINK_GROUP="https://chat.whatsapp.com/DJDWRobITde5Mc7SZ4De1R"

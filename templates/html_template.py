@@ -80,7 +80,7 @@ def render_dolar_newsletter(date_str: str, cotacao: str, variacao: str, min_val:
                 Inteligência de Mercado &bull; Análise Macroeconômica &bull; Visão de Futuro
               </p>
               <p style="color: #64748b; font-size: 11px; margin: 0;">
-                Este boletim é informativo. Acesse <a href="https://projetobrasil2050.site" target="_blank" style="color: #cbd5e1; text-decoration: underline;">projetobrasil2050.site</a>
+                Este boletim é informativo. Acesse <a href="https://quantisia.com.br" target="_blank" style="color: #cbd5e1; text-decoration: underline;">quantisia.com.br</a>
               </p>
             </td>
           </tr>

@@ -109,7 +109,7 @@ def render_ai_bulletin_html(date_str: str, edition_num: str, highlights: list[di
 
     <div class="footer">
         <strong>Projeto Brasil 2050</strong> &bull; Centro de Inteligência e Automação Agêntica<br>
-        Acesse: projetobrasil2050.site
+        Acesse: quantisia.com.br
     </div>
 </body>
 </html>"""
